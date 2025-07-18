@@ -505,28 +505,40 @@ class MarketOrderCacheDBUtils(MarkerOrderDBUtils, CommonCacheUtils):
                 return result.scalar()
 
     @classmethod
-    async def select_max_buy_by_type_id_and_location_id(cls, target_id, target_location):
+    async def select_max_buy_by_type_id_and_location_id(cls, target_id, target_location=None):
         async_session = dbm.async_session(cls.cls_model)
         async with async_session() as session:
             async with session.begin():
-                stmt = select(func.max(cls.cls_model.price)).where(
-                    (cls.cls_model.type_id == target_id) &
-                    (cls.cls_model.location_id == target_location) &
-                    (cls.cls_model.is_buy_order == True)
-                )
+                if target_location:
+                    stmt = select(func.max(cls.cls_model.price)).where(
+                        (cls.cls_model.type_id == target_id) &
+                        (cls.cls_model.location_id == target_location) &
+                        (cls.cls_model.is_buy_order == True)
+                    )
+                else:
+                    stmt = select(func.max(cls.cls_model.price)).where(
+                        (cls.cls_model.type_id == target_id) &
+                        (cls.cls_model.is_buy_order == True)
+                    )
                 result = await session.execute(stmt)
                 return result.scalar()
 
     @classmethod
-    async def select_min_sell_by_type_id_and_location_id(cls, target_id, target_location):
+    async def select_min_sell_by_type_id_and_location_id(cls, target_id, target_location=None):
         async_session = dbm.async_session(cls.cls_model)
         async with async_session() as session:
             async with session.begin():
-                stmt = select(func.min(cls.cls_model.price)).where(
-                    (cls.cls_model.type_id == target_id) &
-                    (cls.cls_model.location_id == target_location) &
-                    (cls.cls_model.is_buy_order == False)
-                )
+                if target_location:
+                    stmt = select(func.min(cls.cls_model.price)).where(
+                        (cls.cls_model.type_id == target_id) &
+                        (cls.cls_model.location_id == target_location) &
+                        (cls.cls_model.is_buy_order == False)
+                    )
+                else:
+                    stmt = select(func.min(cls.cls_model.price)).where(
+                        (cls.cls_model.type_id == target_id) &
+                        (cls.cls_model.is_buy_order == False)
+                    )
                 result = await session.execute(stmt)
                 return result.scalar()
 
