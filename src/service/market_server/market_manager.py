@@ -36,6 +36,7 @@ class MarketManager():
         if not cls.init_status:
             frt_market = Market("frt")
             jita_market = Market("jita")
+            plex_market = Market("plex")
 
             try:
                 ac_character_id = int(config['EVE']['MARKET_AC_CHARACTER_ID'])
@@ -46,6 +47,7 @@ class MarketManager():
 
             cls.market_dict["jita"] = jita_market
             cls.market_dict["frt"] = frt_market
+            cls.market_dict['plex'] = plex_market
         cls.init_status = True
         logger.info(f"初始化市场. {id(cls)}")
 

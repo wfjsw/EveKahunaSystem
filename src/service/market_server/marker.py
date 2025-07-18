@@ -22,7 +22,9 @@ from ..log_server import logger
 
 REGION_FORGE_ID = 10000002
 REGION_VALE_ID = 10000003
+REGION_PLEX_ID = 19000001
 JITA_TRADE_HUB_STRUCTURE_ID = 60003760
+PLEX_ID = 44992
 FRT_4H_STRUCTURE_ID = 1035466617946
 S33RB_O_STRUCTURE_ID = 1045441547980
 PIMI_STRUCTURE_LIST = [1042508032148, 1042499803831, 1044752365771]
@@ -64,10 +66,10 @@ class Market:
 
     def __init__(self, market_type="jita"):
         self.market_type = market_type
-        if market_type == "jita":
-            self.location_id = JITA_TRADE_HUB_STRUCTURE_ID
-        else:
+        if market_type == "frt":
             self.location_id = FRT_4H_STRUCTURE_ID
+        else:
+            self.location_id = JITA_TRADE_HUB_STRUCTURE_ID
 
     def set_access_character(self, access_character):
         self.access_character = access_character
@@ -142,6 +144,48 @@ class Market:
                     # 更新进度条但显示错误
                     pbar.update()
 
+    async def get_plex_order(self):
+        max_page = await find_max_page(eveesi.markets_region_orders, REGION_PLEX_ID, begin_page=350, interval=50)
+        # with db.atomic() as txn:
+        logger.info("请求市场。")
+        results = await get_multipages_result(eveesi.markets_region_orders, max_page, REGION_PLEX_ID)
+
+        await MarkerOrderDBUtils.delete_order_by_type_id(PLEX_ID)
+        with tqdm(total=len(results), desc="写入数据库", unit="page", ascii='=-') as pbar:
+            for i, result in enumerate(results):
+                try:
+                    await MarkerOrderDBUtils.insert_many(result)
+                    pbar.update()
+                except Exception as e:
+                    # 详细记录错误信息
+                    error_msg = [
+                        f"处理页面 {i + 1}/{len(results)} 时出错:",
+                        f"错误类型: {type(e).__name__}",
+                        f"错误信息: {str(e)}",
+                        "异常堆栈:"
+                    ]
+                    error_msg.append(traceback.format_exc())
+
+                    # 检查是否有内部异常
+                    inner_exc = e.__cause__ or e.__context__
+                    if inner_exc:
+                        error_msg.append("内部异常链:")
+                        current = inner_exc
+                        depth = 1
+                        while current:
+                            error_msg.append(f"内部异常 {depth}: {type(current).__name__}: {current}")
+                            inner_trace = traceback.format_tb(current.__traceback__)
+                            error_msg.append(f"内部异常 {depth} 堆栈: {''.join(inner_trace)}")
+                            current = current.__cause__ or current.__context__
+                            depth += 1
+                            if depth > 5:  # 防止过深的递归
+                                error_msg.append("异常嵌套过深，停止追踪")
+                                break
+
+                    logger.error("\n".join(error_msg))
+
+                    # 更新进度条但显示错误
+                    pbar.update()
 
     async def get_market_detail(self) -> tuple[int, int, int, int]:
         if self.market_type == "jita":

@@ -33,6 +33,8 @@ class PriceService:
             if type_id is None:
                 return None, None, None, None, fuzz_list
         if type_id:
+            if type_id == 44992:
+                market = MarketManager.market_dict['plex']
             max_buy, min_sell = await market.get_type_order_rouge(type_id)
 
             # 整理信息

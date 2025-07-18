@@ -438,6 +438,14 @@ class MarkerOrderDBUtils(CommonUtils):
                 stmt = delete(cls.cls_model).where(cls.cls_model.location_id == FRT_4H_STRUCTURE_ID)
                 await session.execute(stmt)
 
+    @classmethod
+    async def delete_order_by_type_id(cls, typeid):
+        async_session = dbm.async_session(cls.cls_model)
+        async with async_session() as session:
+            async with session.begin():
+                stmt = delete(cls.cls_model).where(cls.cls_model.type_id == typeid)
+                await session.execute(stmt)
+
 class MarketOrderCacheDBUtils(MarkerOrderDBUtils, CommonCacheUtils):
     cls_model = MarketOrderCache
     cls_base_model = MarketOrder
