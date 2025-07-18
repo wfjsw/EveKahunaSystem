@@ -213,7 +213,10 @@ class Market:
             target_location = FRT_4H_STRUCTURE_ID
         
         target_id , target_location = type_id, target_location  # replace with actual values
-        
+
+        # plex统一大市场，不需要进行位置筛选
+        if type_id == 44992:
+            target_location = None
         # 获取 is_buy_order=1 的最高价格
         max_price_buy = await MarketOrderCacheDBUtils.select_max_buy_by_type_id_and_location_id(target_id, target_location)
         
