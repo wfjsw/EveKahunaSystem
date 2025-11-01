@@ -88,7 +88,7 @@ class IndustryConfigManager():
     @classmethod
     def get_default_structure_type_by_source_id(cls, source_id: int) -> EffStructUreType:
         """ 在特殊项匹配失败，使用默认建筑分配 """
-        # TODO 特殊项目匹配的设计，可以考虑多种模式：
+        # 特殊项目匹配的设计，可以考虑多种模式：
         # 1. 单品种模式
         # 2. 市场组分类模式market
         # 3. 群组分类模式group

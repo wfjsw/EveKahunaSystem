@@ -13,8 +13,9 @@ from src_v2.core.database.kahuna_database_utils_v2 import (
 from src_v2.core.database.connect_manager import postgres_manager, redis_manager
 from src_v2.core.database.model import User as M_User
 from src_v2.core.database.model import UserData as M_UserData
-# from src_v2.core.database.kahuna_database_utils import UserDBUtils
-# from ..character_server.character_manager import CharacterManager
+from src_v2.core.database.kahuna_database_utils_v2 import EveAuthedCharacterDBUtils
+from src_v2.core.database.kahuna_database_utils_v2 import EveAliasCharacterDBUtils
+from src_v2.core.database.model import EveAliasCharacter as M_EveAliasCharacter
 from src_v2.core.log import logger
 
 # import Exception
@@ -31,11 +32,9 @@ class UserManager(metaclass=SingletonMeta):
         await self.init_user_dict()
 
     async def init_user_dict(self):
-        # TODO postgre 不再全量读取到内存，只保存热点数据
+        #  postgre 不再全量读取到内存，只保存热点数据
         if not self.init_status:
-
-            user_list = await UserDBUtils.select_all()
-            for user in user_list:
+            async for user in await UserDBUtils.select_all():
                 usr_obj = User(
                     user_name=user.user_name,
                     user_role=user.user_role,
@@ -48,7 +47,7 @@ class UserManager(metaclass=SingletonMeta):
 
     async def create_user(self, user_name: AnyStr, passwd_hash: AnyStr) -> User:
         # 检查是否已存在
-        if await UserDBUtils.select_user_where_user_name(user_name):
+        if await UserDBUtils.select_user_by_user_name(user_name):
             raise KahunaException("用户已存在")
 
         # 信息入库
@@ -64,9 +63,7 @@ class UserManager(metaclass=SingletonMeta):
             await UserDBUtils.save_obj(user_database_obj, session=session)
             #  创建userdata
             userdata_database_obj = M_UserData(
-                user_name=user_name,
-                user_qq=None,
-                main_character_id=None
+                user_name=user_name
             )
             await UserDataDBUtils.save_obj(userdata_database_obj, session=session)
 
@@ -81,42 +78,59 @@ class UserManager(metaclass=SingletonMeta):
         return self.user_dict.get(user_name, None)
 
     async def get_password_hash(self, user_name: AnyStr):
-        return await UserDBUtils.select_passwd_hash_where_user_name(user_name)
+        return await UserDBUtils.select_passwd_hash_by_user_name(user_name)
 
+    async def get_user_data(self, user_name: AnyStr):
+        user_data = await UserDataDBUtils.select_user_data_by_user_name(user_name)
+        if not user_data:
+            raise KahunaException("userdata 不存在")
+        return user_data
 
-    # TODO 迁移到CharacerManager
-    # async def get_main_character_id(self, user_name: AnyStr):
-    #     if not self.user_dict.get(user_name, None):
-    #         raise KahunaException("用户不存在")
-    #
-    #     # 从redis中提取
-    #     redis = redis_manager.get_redis()
-    #     userdata_cache = await redis.hgetall(f"user_data:{user_name}")
-    #     if userdata_cache:
-    #         return userdata_cache["main_character_id"]
-    #
-    #     user_data = await UserDataDBUtils.select_all_where_user_name(user_name)
-    #     if not user_data:
-    #         raise KahunaException("userdata 不存在")
-    #     await redis.hset(f"user_data:{user_name}", mapping={
-    #         "user_name": user_name,
-    #         "user_qq": user_data.user_qq
-    #     })
-    #
-    #     return user_data.main_character_id
+    async def get_main_character_id(self, user_name: AnyStr):
+        main_character_id = await redis_manager.redis.get(f"user_{user_name}:main_character_id")
+        if main_character_id:
+            return int(main_character_id)
+        user_data = await UserDataDBUtils.select_user_data_by_user_name(user_name)
+        if not user_data:
+            raise KahunaException("用户数据不存在")
+        if not user_data.main_character_id:
+            raise KahunaException("用户主角色未设置")
+        await redis_manager.redis.set(f"user_{user_name}:main_character_id", user_data.main_character_id, ex=60 * 60)
+        return user_data.main_character_id
 
-    # TODO 迁移到CharacerManager
-    # async def set_main_character(self, user_name: AnyStr, main_character: str):
-    #     user = cls.get_user(qq)
-    #     main_character = CharacterManager.get_character_by_name_qq(main_character, qq)
-    #     user.main_character_id = main_character.character_id
-    #
-    #     await user.insert_to_db()
+    async def set_main_character(self, user_name: AnyStr, main_character_name: str):
+        character = await EveAuthedCharacterDBUtils.select_character_by_character_name(main_character_name)
+        if not character:
+            raise KahunaException("角色不存在")
+        main_character_id = character.character_id
+        user_data = await UserDataDBUtils.select_user_data_by_user_name(user_name)
+        if not user_data:
+            raise KahunaException("用户数据不存在")
+        user_data.main_character_id = main_character_id
+        await UserDataDBUtils.merge(user_data)
+        await redis_manager.redis.set(f"user_{user_name}:main_character_id", main_character_id, ex=60 * 60)
+
+    async def update_same_title_alias_characters(self, character_list: list, main_character_id):
+        for character in character_list:
+            alias_character = await EveAliasCharacterDBUtils.select_alias_character_by_character_id(character.character_id)
+            if not alias_character:
+                await EveAliasCharacterDBUtils.save_obj(M_EveAliasCharacter(
+                    alias_character_id=character.character_id,
+                    main_character_id=main_character_id,
+                    character_name=character.name,
+                    enabled=False
+                ))
+
+    async def get_alias_character_list(self, main_character_id: int):
+        alias_character_list = []
+        async for alias_character in await EveAliasCharacterDBUtils.select_all_by_main_character_id(main_character_id):
+            alias_character_list.append(alias_character)
+        return alias_character_list
 
     def user_exists(self, user_name: AnyStr) -> bool:
         return user_name in self.user_dict.keys()
 
-    # TODO VIP系统挂起
+    # VIP系统挂起
     # @classmethod
     # def add_member_time(cls, qq: int, days: int):
     #     if (user := cls.user_dict.get(qq, None)) is None:
@@ -125,17 +139,16 @@ class UserManager(metaclass=SingletonMeta):
 
 
     async def delete_user(self, user_name: AnyStr):
-        if self.user_dict.get(user_name, None) is None:
-            return
-
         async with postgres_manager.get_session() as session:
-            # 删除user
-            await UserDBUtils.delete_user_where_user_username(user_name, session=session)
             # 删除userdata
-            await UserDataDBUtils.delete_userdata_where_username(user_name, session=session)
+            await UserDataDBUtils.delete_user_data_by_user_name(user_name, session=session)
+            # 删除user
+            await UserDBUtils.delete_user_by_user_username(user_name, session=session)
             # 从内存移除
-            self.user_dict.pop(user_name)
+            if user_name in self.user_dict:
+                self.user_dict.pop(user_name)
 
+        
     #
     # async def clean_member_time(cls, qq: int) -> User:
     #     if (user := cls.user_dict.get(qq, None)) is None:

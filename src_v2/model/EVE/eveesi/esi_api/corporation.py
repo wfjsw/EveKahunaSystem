@@ -1,0 +1,140 @@
+import asyncio
+
+from ..esi_req_manager import esi_request
+from ..eveutils import get_request_async, tqdm_manager, OUT_PAGE_ERROR
+
+
+@esi_request
+async def corporations_corporation_id_industry_jobs(
+        access_token, corporation_id: int, page: int=1, include_completed: bool = False, max_retries=3, log=True
+):
+    if not isinstance(access_token, str):
+        ac_token = await access_token
+    else:
+        ac_token = access_token
+    data, pages = await get_request_async(
+    f"https://esi.evetech.net/latest/corporations/{corporation_id}/industry/jobs/",
+        headers={"Authorization": f"Bearer {ac_token}"},
+        params={
+            "page": page,
+            "include_completed": 1 if include_completed else 0
+        }, log=log, max_retries=max_retries,
+        no_retry_code=[OUT_PAGE_ERROR]
+    )
+    if page != 1:
+        await tqdm_manager.update_mission(f'corporations_corporation_id_industry_jobs_{corporation_id}')
+        return data
+
+    await tqdm_manager.add_mission(f'corporations_corporation_id_industry_jobs_{corporation_id}', pages)
+    tasks = []
+    data = [data]
+    for p in range(2, pages + 1):
+        tasks.append(corporations_corporation_id_industry_jobs(ac_token, corporation_id, p, include_completed, max_retries, log))
+    page_results = await asyncio.gather(*tasks)
+    for data_page in page_results:
+        data.append(data_page)
+    await tqdm_manager.complete_mission(f'corporations_corporation_id_industry_jobs_{corporation_id}')
+
+    return data
+
+
+
+@esi_request
+async def corporations_corporation_assets(access_token, corporation_id: int, page: int=1, test=False, max_retries=3, log=True):
+    """
+    # is_blueprint_copy - Boolean
+    # is_singleton - Boolean
+    # item_id - Integer
+    # location_flag - String
+    # location_id - Integer
+    # location_type - String
+    # quantity - Integer
+    # type_id - Integer
+    """
+    if not isinstance(access_token, str):
+        ac_token = await access_token
+    else:
+        ac_token = access_token
+    data, pages = await get_request_async(
+        f"https://esi.evetech.net/latest/corporations/{corporation_id}/assets/",
+        headers={"Authorization": f"Bearer {ac_token}"}, params={"page": page}, log=log, max_retries=max_retries,
+        no_retry_code=[OUT_PAGE_ERROR]
+    )
+
+    if test or page != 1:
+        if page != 1:
+            await tqdm_manager.update_mission(f'corporations_corporation_assets_{corporation_id}')
+        return data
+
+    await tqdm_manager.add_mission(f'corporations_corporation_assets_{corporation_id}', pages)
+    tasks = []
+    data = [data]
+    for p in range(2, pages + 1):
+        tasks.append(corporations_corporation_assets(ac_token, corporation_id, p, test, max_retries, log))
+    page_results = await asyncio.gather(*tasks)
+    for data_page in page_results:
+        data.append(data_page)
+    await tqdm_manager.complete_mission(f'corporations_corporation_assets_{corporation_id}')
+
+    return data
+
+@esi_request
+async def corporations_corporation_id_roles(access_token, corporation_id: int, log=True):
+    ac_token = await access_token
+    data, _ = await get_request_async(f"https://esi.evetech.net/latest/corporations/{corporation_id}/roles/",
+                       headers={"Authorization": f"Bearer {ac_token}"}, log=log, max_retries=1)
+    return data
+
+# Get corporation information
+# https://esi.evetech.net/corporations/{corporation_id}
+@esi_request
+async def corporations_corporation_id(corporation_id: int, log=True):
+    data, _ = await get_request_async(f"https://esi.evetech.net/latest/corporations/{corporation_id}/",
+                       log=log, max_retries=1)
+    return data
+
+# Get corporation icon
+# https://esi.evetech.net/corporations/{corporation_id}/icons
+@esi_request
+async def corporations_corporation_id_icons(corporation_id: int, log=True):
+    data, _ = await get_request_async(f"https://esi.evetech.net/latest/corporations/{corporation_id}/icons/",
+                       log=log, max_retries=1)
+    return data
+
+
+@esi_request
+async def corporations_corporation_id_blueprints(access_token, corporation_id: int, page: int=1, max_retries=3, log=True):
+    if not isinstance(access_token, str):
+        ac_token = await access_token
+    else:
+        ac_token = access_token
+    data, pages = await get_request_async(
+        f"https://esi.evetech.net/latest/corporations/{corporation_id}/blueprints/",
+        headers={"Authorization": f"Bearer {ac_token}"}, params={"page": page}, log=log, max_retries=max_retries,
+        no_retry_code=[OUT_PAGE_ERROR]
+    )
+    if page != 1:
+        await tqdm_manager.update_mission(f'corporations_corporation_id_blueprints_{corporation_id}')
+        return data
+
+    await tqdm_manager.add_mission(f'corporations_corporation_id_blueprints_{corporation_id}', pages)
+    tasks = []
+    data = [data]
+    for p in range(2, pages + 1):
+        tasks.append(corporations_corporation_id_blueprints(ac_token, corporation_id, p, max_retries, log))
+    page_results = await asyncio.gather(*tasks)
+    for data_page in page_results:
+        data.append(data_page)
+    await tqdm_manager.complete_mission(f'corporations_corporation_id_blueprints_{corporation_id}')
+
+    return data
+
+# Get corporation members
+# esi-corporations.read_corporation_membership.v1
+# https://esi.evetech.net/corporations/{corporation_id}/members
+@esi_request
+async def corporations_corporation_id_members(access_token, corporation_id: int, log=True):
+    ac_token = await access_token
+    data, _ = await get_request_async(f"https://esi.evetech.net/latest/corporations/{corporation_id}/members/",
+                       headers={"Authorization": f"Bearer {ac_token}"}, log=log, max_retries=1)
+    return data

@@ -1,0 +1,162 @@
+import asyncio
+
+from ..esi_req_manager import esi_request
+from ..eveutils import get_request_async, tqdm_manager, OUT_PAGE_ERROR, parse_token
+
+@esi_request
+async def character_character_id_skills(access_token, character_id, log=True):
+    ac_token = await access_token
+    data, _ = await get_request_async(f"https://esi.evetech.net/latest/characters/{character_id}/skills/",
+                       headers={"Authorization": f"Bearer {ac_token}"}, log=log)
+    return data
+
+@esi_request
+async def character_character_id_wallet(access_token, character_id, log=True):
+    ac_token = await access_token
+    data, _ = await get_request_async(f"https://esi.evetech.net/latest/characters/{character_id}/wallet/",
+                       headers={"Authorization": f"Bearer {ac_token}"}, log=log)
+    return data
+
+@esi_request
+async def character_character_id_portrait(access_token, character_id, log=True):
+    ac_token = await access_token
+    data, _ = await get_request_async(f"https://esi.evetech.net/latest/characters/{character_id}/portrait/",
+                       headers={"Authorization": f"Bearer {ac_token}"}, log=log)
+    return data
+
+@esi_request
+async def characters_character_id_blueprints(access_token, character_id: int, page: int=1, max_retries=3, log=True):
+    if not isinstance(access_token, str):
+        ac_token = await access_token
+    else:
+        ac_token = access_token
+    data, pages = await get_request_async(
+        f"https://esi.evetech.net/latest/characters/{character_id}/blueprints/",
+        headers={"Authorization": f"Bearer {ac_token}"}, params={"page": page}, log=log, max_retries=max_retries,
+        no_retry_code=[OUT_PAGE_ERROR]
+    )
+    if page != 1:
+        await tqdm_manager.update_mission(f'character_character_id_blueprints_{character_id}')
+        return data
+
+    await tqdm_manager.add_mission(f'character_character_id_blueprints_{character_id}', pages)
+    tasks = []
+    data = [data]
+    for p in range(2, pages + 1):
+        tasks.append(characters_character_id_blueprints(ac_token, character_id, p, max_retries, log))
+        # 使用asyncio.gather同时等待所有任务完成
+    page_results = await asyncio.gather(*tasks)
+    # 将所有页面的结果合并到data中
+    for page_data in page_results:
+        data.append(page_data)
+
+    await tqdm_manager.complete_mission(f'character_character_id_blueprints_{character_id}')
+
+    return data
+
+
+@esi_request
+async def characters_character_assets(access_token, character_id: int, page: int=1, test=False, max_retries=3, log=True):
+    if not isinstance(access_token, str):
+        ac_token = await access_token
+    else:
+        ac_token = access_token
+    data, pages = await get_request_async(
+        f"https://esi.evetech.net/latest/characters/{character_id}/assets/",
+        headers={"Authorization": f"Bearer {ac_token}"}, params={"page": page}, log=log, max_retries=max_retries,
+        no_retry_code=[OUT_PAGE_ERROR]
+    )
+
+    if test or page != 1:
+        if page != 1:
+            await tqdm_manager.update_mission(f'characters_character_assets_{character_id}')
+        return data
+
+    await tqdm_manager.add_mission(f'characters_character_assets_{character_id}', pages)
+    tasks = []
+    data = [data]
+    for p in range(2, pages + 1):
+        tasks.append(characters_character_assets(ac_token, character_id, p, test, max_retries, log))
+    page_results = await asyncio.gather(*tasks)
+    for data_page in page_results:
+        data.append(data_page)
+    await tqdm_manager.complete_mission(f'characters_character_assets_{character_id}')
+
+    return data
+
+@esi_request
+async def characters_character(character_id, log=True):
+    """
+# alliance_id - Integer
+# birthday -  String (date-time)
+# bloodline_id - Integer
+# corporation_id - Integer
+# description - String
+# faction_id - Integer
+# gender - String
+# name - String
+# race_id - Integer
+# security_status - Float (min: -10, max: 10)
+# title - String
+    """
+    data, _ = await get_request_async(f"https://esi.evetech.net/latest/characters/{character_id}/", log=log)
+    data["character_id"] = character_id
+    return data
+
+
+@esi_request
+async def characters_character_id_industry_jobs(access_token, character_id: int, include_completed: bool = False, log=True):
+    """
+    List character industry jobs
+    Args:
+        access_token: Access token
+        character_id: An EVE character ID
+        datasource: The server name you would like data from
+        include_completed: Whether to retrieve completed character industry jobs
+    Returns:
+        Industry jobs placed by a character
+    """
+    ac_token = await access_token
+    data, _ = await get_request_async(f"https://esi.evetech.net/latest/characters/{character_id}/industry/jobs/", headers={
+        "Authorization": f"Bearer {ac_token}"
+    }, params={
+        "include_completed": 1 if include_completed else 0
+    }, log=log)
+
+    return data
+
+
+
+# /characters/{character_id}/orders/
+@esi_request
+async def characters_character_orders(access_token, character_id: int, log=True):
+    ac_token = await access_token
+    data, _ = await get_request_async(
+        f"https://esi.evetech.net/latest/characters/{character_id}/orders/",
+        headers={"Authorization": f"Bearer {ac_token}"},
+        log=log
+    )
+    return data
+
+# Get character portraits
+# https://esi.evetech.net/characters/{character_id}/portrait
+@esi_request
+async def characters_character_portrait(character_id: int, log=True):
+    datg, _ = await get_request_async(
+        f"https://esi.evetech.net/latest/characters/{character_id}/portrait/",
+        log=log
+    )
+    return datg
+
+# Get character corporation roles
+# esi-characters.read_corporation_roles.v1
+# https://esi.evetech.net/characters/{character_id}/roles
+@esi_request
+async def characters_character_roles(access_token, character_id: int, log=True):
+    ac_token = await parse_token(access_token)
+    data, _ = await get_request_async(
+        f"https://esi.evetech.net/latest/characters/{character_id}/roles/",
+        headers={"Authorization": f"Bearer {ac_token}"},
+        log=log
+    )
+    return data

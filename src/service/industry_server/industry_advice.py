@@ -355,7 +355,7 @@ class IndustryAdvice:
             'order': 0
         }
 
-        # TODO 获取珍贵物品
+        # 获取珍贵物品
         # 暂时pass
 
         # 获取订单数据

@@ -76,6 +76,47 @@ class PostgreDatabaseManager():
             }
         return columns
 
+    def _get_postgresql_type(self, col_type):
+        """将 SQLAlchemy 类型转换为 PostgreSQL 类型字符串"""
+        from sqlalchemy.dialects import postgresql
+        
+        # 尝试使用 SQLAlchemy 的类型编译功能（最可靠的方法）
+        try:
+            # 使用 PostgreSQL 方言编译类型
+            dialect = postgresql.dialect()
+            compiled = col_type.compile(dialect=dialect)
+            return str(compiled)
+        except Exception:
+            # 如果编译失败，使用简单的类型映射
+            pass
+        
+        # 简单的类型映射作为后备方案
+        type_mapping = {
+            'Integer': 'INTEGER',
+            'BigInteger': 'BIGINT',
+            'Text': 'TEXT',
+            'String': 'TEXT',
+            'DateTime': 'TIMESTAMP',
+            'Date': 'DATE',
+            'Time': 'TIME',
+            'Float': 'REAL',
+            'Numeric': 'NUMERIC',
+            'Boolean': 'BOOLEAN',
+            'LargeBinary': 'BYTEA',
+        }
+        
+        # 尝试通过类型名称匹配
+        type_name = type(col_type).__name__
+        if type_name in type_mapping:
+            # 如果是 ARRAY 类型，需要特殊处理
+            if hasattr(col_type, 'item_type'):
+                base_type = self._get_postgresql_type(col_type.item_type)
+                return f'{base_type}[]'
+            return type_mapping[type_name]
+        
+        # 默认返回 TEXT
+        return 'TEXT'
+
     async def _check_table_exists(self, conn, table_name: str) -> bool:
         """检查表是否存在"""
         query = text("""
@@ -180,13 +221,23 @@ class PostgreDatabaseManager():
                 temp_table_name = f"{table_name}__tmp__{timestamp_suffix}"
                 backup_table_name = f"{table_name}__old__{timestamp_suffix}"
 
-                # 使用 SQLAlchemy 根据模型定义创建临时新表
-                def _create_temp_table(sync_conn):
-                    # 将模型表复制到新的 MetaData，并命名为临时表名
-                    new_meta = model_class.metadata.__class__()
-                    new_table = model_class.__table__.tometadata(new_meta, name=temp_table_name)
-                    new_table.create(bind=sync_conn)
-                await conn.run_sync(_create_temp_table)
+                # 使用原始 SQL 创建临时表（不包含外键约束）
+                async def _create_temp_table_without_fk():
+                    """创建临时表，仅包含列定义，不包含外键约束"""
+                    columns_def = []
+                    for col in model_class.__table__.columns:
+                        col_def = f'"{col.name}" {self._get_postgresql_type(col.type)}'
+                        if col.primary_key:
+                            col_def += ' PRIMARY KEY'
+                        if not col.nullable and not col.primary_key:
+                            col_def += ' NOT NULL'
+                        columns_def.append(col_def)
+                    
+                    # 创建表（不包含外键和索引）
+                    create_sql = f'CREATE TABLE "{temp_table_name}" ({", ".join(columns_def)})'
+                    await conn.execute(text(create_sql))
+                
+                await _create_temp_table_without_fk()
 
                 if has_rows:
                     # 计算交集列（仅复制旧表中存在，且新表也存在的列）
@@ -204,6 +255,67 @@ class PostgreDatabaseManager():
                 # 交换表名：旧表改为备份名，临时表改为正式名
                 await conn.execute(text(f'ALTER TABLE "{table_name}" RENAME TO "{backup_table_name}"'))
                 await conn.execute(text(f'ALTER TABLE "{temp_table_name}" RENAME TO "{table_name}"'))
+
+                # 添加外键约束（如果模型中有定义）
+                for col in model_class.__table__.columns:
+                    for fk in col.foreign_keys:
+                        # 生成外键约束名称
+                        fk_name = f'fk_{table_name}_{col.name}'
+                        # 获取引用的表和列
+                        ref_table = fk.column.table.name
+                        ref_col = fk.column.name
+                        # 添加外键约束
+                        try:
+                            alter_sql = text(
+                                f'ALTER TABLE "{table_name}" '
+                                f'ADD CONSTRAINT "{fk_name}" '
+                                f'FOREIGN KEY ("{col.name}") '
+                                f'REFERENCES "{ref_table}" ("{ref_col}")'
+                            )
+                            await conn.execute(alter_sql)
+                            logger.info(f"已为表 {table_name} 的列 {col.name} 添加外键约束")
+                        except Exception as e:
+                            logger.warning(f"添加外键约束失败（可能已存在）: {e}")
+
+                # 添加索引（如果模型中有定义）
+                for idx in model_class.__table__.indexes:
+                    # 跳过主键索引和唯一约束（已在列定义中处理）
+                    if idx.name and not idx.unique:
+                        try:
+                            idx_cols = ', '.join([f'"{col.name}"' for col in idx.columns])
+                            create_idx_sql = text(
+                                f'CREATE INDEX IF NOT EXISTS "{idx.name}" '
+                                f'ON "{table_name}" ({idx_cols})'
+                            )
+                            await conn.execute(create_idx_sql)
+                            logger.info(f"已为表 {table_name} 添加索引 {idx.name}")
+                        except Exception as e:
+                            logger.warning(f"添加索引失败: {e}")
+                
+                # 处理列上的 index=True（隐式索引）
+                for col in model_class.__table__.columns:
+                    # 检查列是否有 index=True 但不在 table.indexes 中
+                    if hasattr(col, 'index') and col.index and not col.primary_key:
+                        # 检查是否已有显式索引（通过列名匹配）
+                        has_explicit_idx = False
+                        for idx in model_class.__table__.indexes:
+                            # 检查索引中是否包含此列
+                            if any(c.name == col.name for c in idx.columns):
+                                has_explicit_idx = True
+                                break
+                        
+                        if not has_explicit_idx:
+                            # 创建隐式索引（SQLAlchemy 通常命名为 {table_name}_{column_name}_idx）
+                            implicit_idx_name = f"{table_name}_{col.name}_idx"
+                            try:
+                                create_idx_sql = text(
+                                    f'CREATE INDEX IF NOT EXISTS "{implicit_idx_name}" '
+                                    f'ON "{table_name}" ("{col.name}")'
+                                )
+                                await conn.execute(create_idx_sql)
+                                logger.info(f"已为表 {table_name} 的列 {col.name} 添加隐式索引")
+                            except Exception as e:
+                                logger.warning(f"添加隐式索引失败: {e}")
 
                 # 删除旧表备份
                 await self._drop_table(conn, backup_table_name)
@@ -276,8 +388,8 @@ class PostgreDatabaseManager():
 
         # 创建表结构
         if not base_classes:
-            from .model import __all__
-            base_classes = __all__
+            from .model import all_model
+            base_classes = all_model
         async with self.engine.begin() as conn:
             for base_class in base_classes:
                 await self.create_default_table(conn, base_class)
@@ -325,6 +437,9 @@ class RedisDatabaseManager():
             decode_responses=True
         )
 
+        # 删除forever:开头的key之外的数据
+        await self._redis.flushall()
+        
         logger.info(f"Redis 连接成功: {host}:{port}")
 
     @property

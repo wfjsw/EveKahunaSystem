@@ -84,7 +84,7 @@ class IdsUtils:
 
         return [child_id, structure, quantity]
 
-    # TODO map功能
+    # map功能
     # @classmethod
     # async def init_type_map(cls):
     #     map_list = await InvTypeMapDBUtils.select_all()

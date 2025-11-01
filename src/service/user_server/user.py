@@ -111,7 +111,7 @@ class UserData():
     def feishu_token(self, token: str):
         self.feishu_sheet_token = token
 
-# TODO postgre 适配user对象的修改
+# postgre 适配user对象的修改
 class User():
     def __init__(self, qq: int, create_date: datetime, expire_date: datetime):
         self.user_qq = qq
@@ -194,7 +194,7 @@ class User():
         self.user_data.plan[plan_name]["plan"].append([product, quantity])
         await self.user_data.insert_to_db()
 
-    # TODO这是工业的功能，需要迁移
+    # 需要迁移
     @deprecated
     async def create_plan(self, plan_name: str,
                     bp_matcher, st_matcher, prod_block_matcher

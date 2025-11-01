@@ -23,7 +23,7 @@ class UserManager():
 
     @classmethod
     async def init_user_dict(cls):
-        # TODO postgre 不再全量读取到内存，只保存热点数据
+        # postgre 不再全量读取到内存，只保存热点数据
         if not cls.init_status:
 
             user_list = await UserDBUtils.select_all()
