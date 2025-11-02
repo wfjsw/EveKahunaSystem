@@ -6,6 +6,9 @@ import traceback
 from src_v2.core.user.user_manager import UserManager
 from src_v2.model.EVE.character.character_manager import CharacterManager
 from src_v2.core.database.kahuna_database_utils_v2 import EvePublicCharacterInfoDBUtils
+from src_v2.core.database.model import EveAliasCharacter as M_EveAliasCharacter
+from src_v2.core.database.kahuna_database_utils_v2 import EveAliasCharacterDBUtils
+from src_v2.model.EVE.eveesi import eveesi
 from src_v2.core.utils import KahunaException
 
 api_user_bp = Blueprint('api_user', __name__, url_prefix='/api/user')
@@ -130,4 +133,134 @@ async def get_alias_character_list():
             "Enabled": alias_character.enabled
         } for alias_character in alias_character_list])
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@api_user_bp.route('/searchCharacter', methods=['POST'])
+@auth_required
+async def search_character():
+    """搜索角色（通过角色ID或角色名称）"""
+    try:
+        user_id = g.current_user["user_id"]
+        data = await request.get_json()
+        input_type = data.get("inputType")  # 'characterId' or 'characterName'
+        input_value = data.get("inputValue", "").strip()
+        
+        if not input_value:
+            return jsonify({"error": "请输入搜索值"}), 400
+        
+        from src_v2.model.EVE.eveesi.esi_api.character import characters_character
+        from src_v2.core.database.kahuna_database_utils_v2 import EvePublicCharacterInfoDBUtils
+        
+        result = []
+        
+        if input_type == 'characterId':
+            # 如果是数字，尝试作为character_id查询
+            try:
+                character_id = int(input_value)
+                character_info = await characters_character(character_id)
+                if character_info:
+                    result.append({
+                        "CharacterId": character_info.get("character_id", character_id),
+                        "CharacterName": character_info.get("name", "")
+                    })
+            except ValueError:
+                return jsonify({"error": "角色ID必须是数字"}), 400
+            except Exception as e:
+                logger.error(f"搜索角色失败: {traceback.format_exc()}")
+                return jsonify({"error": f"搜索失败: {str(e)}"}), 500
+        else:  # characterName
+            main_character_id = await UserManager().get_main_character_id(user_id)
+            search_result = await eveesi.search(CharacterManager().character_dict[main_character_id].ac_token, main_character_id, ["character"], input_value)
+            if search_result:
+                character_id_list = search_result.get("character", [])
+                for character_id in character_id_list:
+                    character_info = await characters_character(character_id)
+                    if character_info:
+                        result.append({
+                            "CharacterId": character_info.get("character_id", character_id),
+                            "CharacterName": character_info.get("name", "")
+                        })
+        
+        return jsonify(result)
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
+@api_user_bp.route('/addAliasCharacters', methods=['POST'])
+@auth_required
+async def add_alias_characters():
+    """添加选中的别名角色"""
+    try:
+        user_id = g.current_user["user_id"]
+        data = await request.get_json()
+        character_ids = data.get("characterIds", [])  # 角色ID列表
+        
+        if not character_ids:
+            return jsonify({"error": "请至少选择一个角色"}), 400
+        
+        main_character_id = await UserManager().get_main_character_id(user_id)
+        
+        from src_v2.model.EVE.eveesi.esi_api.character import characters_character
+        from src_v2.core.database.kahuna_database_utils_v2 import EveAliasCharacterDBUtils
+        from src_v2.core.database.model import EveAliasCharacter as M_EveAliasCharacter
+        
+        added_count = 0
+        failed_list = []
+        
+        for character_id in character_ids:
+            try:
+                # 检查是否已存在
+                existing = await EveAliasCharacterDBUtils.select_alias_character_by_character_id(character_id)
+                if existing:
+                    continue  # 已存在，跳过
+                
+                # 获取角色信息
+                character_info = await characters_character(character_id)
+                if not character_info:
+                    failed_list.append(str(character_id))
+                    continue
+                
+                # 添加别名角色
+                await EveAliasCharacterDBUtils.save_obj(M_EveAliasCharacter(
+                    alias_character_id=character_id,
+                    main_character_id=main_character_id,
+                    character_name=character_info.get("name", ""),
+                    enabled=False
+                ))
+                added_count += 1
+            except Exception as e:
+                logger.error(f"添加角色 {character_id} 失败: {traceback.format_exc()}")
+                failed_list.append(str(character_id))
+        
+        # 刷新别名角色列表
+        alias_character_list = await UserManager().get_alias_character_list(main_character_id)
+        
+        return jsonify({
+            "message": f"成功添加 {added_count} 个角色",
+            "failedList": failed_list,
+            "aliasCharacterList": [{
+                "CharacterId": alias_character.alias_character_id,
+                "CharacterName": alias_character.character_name,
+                "Enabled": alias_character.enabled
+            } for alias_character in alias_character_list]
+        })
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
+@api_user_bp.route('/saveAliasCharacters', methods=['POST'])
+@auth_required
+async def save_alias_characters():
+    try:
+        data = await request.get_json()
+        aliasCharacterList = data.get("aliasCharacterList", [])
+        for alias_character in aliasCharacterList:
+            alias_character_obj = await EveAliasCharacterDBUtils.select_alias_character_by_character_id(alias_character["CharacterId"])
+            if not alias_character:
+                continue
+            alias_character_obj.enabled = alias_character["Enabled"]
+            await EveAliasCharacterDBUtils.save_obj(alias_character_obj)
+        return jsonify({"message": "保存成功"})
+    except Exception as e:
+        logger.error(traceback.format_exc())
         return jsonify({"error": str(e)}), 500

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { http } from '@/http'
 
@@ -185,9 +185,15 @@ const getIsAliasCharacterSettingAvaliable = async () => {
 }
 
 const aliasCharacterList = ref<{ CharacterId: number, CharacterName: string, Enabled: boolean }[]>([])
+let aliasCharacterListEnabled = ref<number[]>([])
 const getAliasCharacterList = async () => {
   const response = await http.get('/user/getAliasCharacterList')
   const data = await response.json()
+  for (const item of data) {
+    if (item.Enabled) {
+      aliasCharacterListEnabled.value.push(item.CharacterId)
+    }
+  }
   aliasCharacterList.value = data || []
 }
 
@@ -197,6 +203,13 @@ const getSameTitleAliasCharacterList = async () => {
   aliasCharacterList.value = data || []
 }
 
+const addNewCharacterProcess = ref(false)
+
+const addSingleNewCharacterForm = reactive({
+  inputType: 'characterId' as 'characterId' | 'characterName',
+  inputValue: ''
+})
+
 onMounted(() => {
   // 页面加载时只获取角色列表，不挂载认证监听器
   // 监听器将在用户点击"开始绑定"按钮时挂载
@@ -204,12 +217,115 @@ onMounted(() => {
   getCharacterList()
   getMainCharacter()
   getIsAliasCharacterSettingAvaliable()
+  getAliasCharacterList()
 })
 
 onBeforeUnmount(() => {
   // 组件卸载时停止轮询
   stopAuthStatusPolling()
 })
+
+const searchResults = ref<{ CharacterId: number, CharacterName: string }[]>([])
+const selectedCharacterIds = ref<number[]>([])
+const searchLoading = ref(false)
+const addLoading = ref(false)
+
+const searchCharacters = async () => {
+  if (!addSingleNewCharacterForm.inputValue.trim()) {
+    ElMessage.warning('请输入搜索值')
+    return
+  }
+  
+  searchLoading.value = true
+  try {
+    const response = await http.post('/user/searchCharacter', {
+      inputType: addSingleNewCharacterForm.inputType,
+      inputValue: addSingleNewCharacterForm.inputValue.trim()
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      if (Array.isArray(data)) {
+        searchResults.value = data
+        selectedCharacterIds.value = [] // 清空之前的选择
+        if (data.length === 0) {
+          ElMessage.info('未找到匹配的角色')
+        }
+      } else if (data.error) {
+        ElMessage.error(data.error)
+        searchResults.value = []
+      }
+    } else {
+      const errorData = await response.json().catch(() => ({ error: '搜索失败' }))
+      ElMessage.error(errorData.error || '搜索失败')
+      searchResults.value = []
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || '搜索失败')
+    searchResults.value = []
+  } finally {
+    searchLoading.value = false
+  }
+}
+
+const addSelectedCharacters = async () => {
+  if (selectedCharacterIds.value.length === 0) {
+    ElMessage.warning('请至少选择一个角色')
+    return
+  }
+  
+  addLoading.value = true
+  try {
+    const response = await http.post('/user/addAliasCharacters', {
+      characterIds: selectedCharacterIds.value
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      ElMessage.success(data.message || '添加成功')
+      if (data.aliasCharacterList) {
+        aliasCharacterList.value = data.aliasCharacterList
+      }
+      // 关闭对话框并重置
+      addNewCharacterProcess.value = false
+      searchResults.value = []
+      selectedCharacterIds.value = []
+      addSingleNewCharacterForm.inputValue = ''
+      // 刷新别名角色列表
+      await getAliasCharacterList()
+    } else {
+      const errorData = await response.json().catch(() => ({ error: '添加失败' }))
+      ElMessage.error(errorData.error || '添加失败')
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || '添加失败')
+  } finally {
+    addLoading.value = false
+  }
+}
+
+const handleSelectionChange = (selection: any[]) => {
+  selectedCharacterIds.value = selection.map(item => item.CharacterId)
+}
+
+const handleSaveAliasCharacters = async () => {
+  // TODO: 实现保存别名角色启用状态的功能
+  for (const item of aliasCharacterList.value) {
+    item.Enabled = aliasCharacterListEnabled.value.includes(item.CharacterId)
+  }
+  try {
+    const response = await http.post('/user/saveAliasCharacters', {
+      aliasCharacterList: aliasCharacterList.value
+    })
+    if (response.ok) {
+      ElMessage.success('保存成功')
+    } else {
+      ElMessage.error('保存失败')
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || '保存失败')
+  }
+}
 </script>
 
 <template>
@@ -257,20 +373,89 @@ onBeforeUnmount(() => {
         <span>点击左侧窗口下的获取按钮可获取同主角色title的所有角色</span>
       </div>
       <el-transfer
+        v-model="aliasCharacterListEnabled"
         :button-texts="['移出', '添加']"
-        :titles="['Source', 'Target']"
+        :titles="['备选角色', '启用角色']"
         :data="aliasCharacterList"
         :props="{
           key: 'CharacterId',
-          label: 'CharacterName',
-          disabled: 'Enabled'
+          label: 'CharacterName'
         }"
         >
         <template #left-footer>
-          <el-button class="transfer-footer" size="medium" @click="getSameTitleAliasCharacterList">获取同title角色</el-button>
+          <el-tooltip content="获取同title角色" placement="top">
+            <el-button class="transfer-footer" size="medium" @click="getSameTitleAliasCharacterList"><el-icon><RefreshRight /></el-icon></el-button>
+          </el-tooltip>
+          <el-tooltip content="添加新角色" placement="top">
+            <el-button class="transfer-footer" size="medium" @click="addNewCharacterProcess = true"><el-icon><Plus /></el-icon></el-button>
+          </el-tooltip>
+
+          <el-dialog 
+            v-model="addNewCharacterProcess"
+            style="max-width: 60%;"
+          >
+            <el-row>
+              <el-col :span="24">
+                <el-form :model="addSingleNewCharacterForm" label-width="auto">
+                  <el-form-item label="搜索方式">
+                    <el-radio-group v-model="addSingleNewCharacterForm.inputType">
+                      <el-radio-button value="characterId">角色ID</el-radio-button>
+                      <el-radio-button value="characterName">角色名称</el-radio-button>
+                    </el-radio-group>
+                  </el-form-item>
+
+                  <el-form-item label="搜索值">
+                    <el-input v-model="addSingleNewCharacterForm.inputValue" placeholder="请输入角色ID或角色名称" />
+                  </el-form-item>
+                </el-form>
+              </el-col>
+            </el-row>
+
+            <el-row>
+              <el-col :span="6" :offset="9">
+                <el-button style="width: 100%;" type="primary" @click="searchCharacters" :loading="searchLoading">搜索</el-button>
+              </el-col>
+            </el-row>
+            
+            <!-- 搜索结果表格 -->
+            <el-row v-if="searchResults.length > 0">
+              <el-col :span="24">
+                <el-table 
+                  :data="searchResults" 
+                  style="width: 100%"
+                  @selection-change="handleSelectionChange"
+                >
+                  <el-table-column type="selection" width="55" />
+                  <el-table-column prop="CharacterId" label="角色ID" />
+                  <el-table-column prop="CharacterName" label="角色名称" />
+                </el-table>
+              </el-col>
+            </el-row>
+
+            <el-row v-if="searchResults.length > 0">
+              <el-col :span="6" :offset="9">
+                <el-button 
+                  style="width: 100%;" 
+                  type="primary" 
+                  @click="addSelectedCharacters"
+                  :loading="addLoading"
+                  :disabled="selectedCharacterIds.length === 0"
+                >
+                  添加选中角色 ({{ selectedCharacterIds.length }})
+                </el-button>
+              </el-col>
+            </el-row>
+
+          </el-dialog>
         </template>
         <template #right-footer>
-          <el-button class="transfer-footer" size="medium">保存</el-button>
+          <el-button 
+            class="transfer-footer" 
+            size="medium"
+            @click="handleSaveAliasCharacters"
+          >
+            保存
+          </el-button>
         </template>
       </el-transfer>
     </el-tab-pane>
@@ -287,8 +472,11 @@ onBeforeUnmount(() => {
 }
 
 .transfer-footer {
-  margin-left: 15px;
   padding: 6px 5px;
-  
+  margin: 3px;
+}
+
+.el-row {
+  margin-bottom: 10px;
 }
 </style>

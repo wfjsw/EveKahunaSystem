@@ -24,6 +24,8 @@ from src_v2.core.database.kahuna_database_utils_v2 import EveCorporationDBUtils
 from src_v2.core.database.model import EveCorporation as M_EveCorporation
 from src_v2.core.database.kahuna_database_utils_v2 import EvePublicCharacterInfoDBUtils
 from src_v2.core.database.model import EvePublicCharacterInfo as M_EvePublicCharacterInfo
+from src_v2.core.database.kahuna_database_utils_v2 import EveAliasCharacterDBUtils
+from src_v2.core.database.model import EveAliasCharacter as M_EveAliasCharacter
 from src_v2.core.picture_render.downloader import IconDownloader
 from src_v2.core.utils.path import DOWNLOAD_RESOURCE_PATH
 
@@ -148,6 +150,10 @@ class CharacterManager(metaclass=SingletonMeta):
                 self.character_dict.pop(character.character_id)
                 return
         raise KahunaException("角色不存在")
+
+    async def delete_all_alias_characters_of_main_character(self, main_character_id: int):
+        async for alias_character in await EveAliasCharacterDBUtils.select_all_by_main_character_id(main_character_id):
+            await EveAliasCharacterDBUtils.delete_obj(alias_character)
 
     async def delete_all_character_of_user(self, owner_user_name: str):
         async for character in await EveAuthedCharacterDBUtils.select_all_by_owner_user_name(owner_user_name):

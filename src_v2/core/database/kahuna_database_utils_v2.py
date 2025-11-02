@@ -162,6 +162,13 @@ class _CommonUtils:
             stmt = delete(cls.cls_model)
             await session.execute(stmt)
 
+    @classmethod
+    async def delete_obj(cls, obj):
+        if not cls.cls_model:
+            raise Exception("cls_model is None")
+        async with dbm.get_session() as session:
+            await session.delete(obj)
+
 class _CommonCacheUtils:
     cls_model = None
     cls_base_model = None
@@ -285,6 +292,14 @@ class EvePublicCharacterInfoDBUtils(_CommonUtils):
     async def select_public_character_info_by_character_id(cls, character_id: int):
         async with dbm.get_session() as session:
             stmt = select(cls.cls_model).where(cls.cls_model.character_id == character_id)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
+    @classmethod
+    async def select_public_character_info_by_name(cls, character_name: str):
+        """根据角色名称查询角色信息"""
+        async with dbm.get_session() as session:
+            stmt = select(cls.cls_model).where(cls.cls_model.name == character_name)
             result = await session.execute(stmt)
             return result.scalars().first()
 

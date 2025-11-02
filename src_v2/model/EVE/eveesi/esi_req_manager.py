@@ -27,7 +27,7 @@ class EsiReqManager:
         self.queue_lock = asyncio.Lock()  # 保护队列操作的锁
         
         # 初始化滑动窗口
-        self.rate_limit = 50  # 每分钟请求限制
+        self.rate_limit = 5  # 每分钟请求限制
         self.window_size = 1  # 窗口大小（秒）
         self.request_timestamps = deque()  # 存储请求时间戳的队列
         self.lock = asyncio.Lock()

@@ -58,7 +58,7 @@ all_model.append(EveAuthedCharacter)
 class EveAliasCharacter(PostgreModel):
     __tablename__ = 'eve_alias_character'
     alias_character_id = Column(Integer, primary_key=True)
-    main_character_id = Column(Integer, nullable=False, index=True)
+    main_character_id = Column(Integer, ForeignKey("eve_authed_character.character_id"), index=True)
     character_name = Column(Text)
     enabled = Column(Boolean)
 all_model.append(EveAliasCharacter)
