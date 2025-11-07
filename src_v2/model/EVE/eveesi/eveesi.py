@@ -10,6 +10,7 @@ from .esi_api.corporation import *
 from .esi_api.industry import *
 from .esi_api.universe import *
 from .esi_api.search import *
+from .esi_api.assets import *
 
 permission_set = set()
 

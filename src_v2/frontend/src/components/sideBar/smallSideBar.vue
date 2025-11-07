@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Setting } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
@@ -10,33 +10,36 @@ const router = useRouter()
 // 侧边栏展开状态
 const isExpanded = ref(false)
 
-// 菜单项数据
-const menuItems = ref<{ id: number; icon: string; label: string; active: boolean; route: string }[]>([])
-
 const authStore = useAuthStore()
 
-let id_index = 1
-const addMenuItem = (item: { id: number; icon: string; label: string; active: boolean; route: string }) => {
-  menuItems.value.push(item)
-  id_index++
-}
+// 使用 computed 响应式地生成菜单项
+const menuItems = computed(() => {
+  const items: { id: number; icon: string; label: string; active: boolean; route: string }[] = []
+  let id_index = 1
+  
+  // 首页始终显示
+  items.push({ id: id_index++, icon: 'House', label: '首页', active: router.currentRoute.value.path === '/home' || router.currentRoute.value.path === '/', route: '/home' })
 
-addMenuItem({ id: id_index, icon: 'House', label: '首页', active: true, route: '/'})
-addMenuItem({ id: id_index, icon: 'Cpu', label: '工业', active: false, route: '/industry'})
-addMenuItem({ id: id_index, icon: 'ShoppingBag', label: '公司商城', active: false, route: '/corpShop'})
-addMenuItem({ id: id_index, icon: 'Opportunity', label: '实用工具', active: false, route: '/utils'})
-addMenuItem({ id: id_index, icon: 'Setting', label: '设置', active: false, route: '/setting'})
-
-if (authStore.user?.role === 'admin') {
-  addMenuItem({ id: id_index, icon: 'Cpu', label: '管理员', active: false, route: '/industry'})
-}
+  // 根据用户角色动态添加菜单项
+  const userRoles = authStore.user?.roles || []
+  if (userRoles.includes('user')) {
+    items.push({ id: id_index++, icon: 'Cpu', label: '工业', active: router.currentRoute.value.path.startsWith('/industry'), route: '/industry' })
+    items.push({ id: id_index++, icon: 'ShoppingBag', label: '公司商城', active: router.currentRoute.value.path === '/corpShop', route: '/corpShop' })
+    items.push({ id: id_index++, icon: 'Opportunity', label: '实用工具', active: router.currentRoute.value.path === '/utils', route: '/utils' })
+    items.push({ id: id_index++, icon: 'Setting', label: '设置', active: router.currentRoute.value.path.startsWith('/setting'), route: '/setting' })
+  }
+  console.log(userRoles)
+  if (userRoles.includes('admin')) {
+    items.push({ id: id_index++, icon: 'Cpu', label: '管理员', active: router.currentRoute.value.path.startsWith('/admin'), route: '/admin' })
+  }
+  
+  return items
+})
 
 // 切换菜单项激活状态
 const toggleActive = (itemId: number) => {
-  menuItems.value.forEach(item => {
-    item.active = item.id === itemId
-  })
-  router.push(menuItems.value.find(item => item.id === itemId)?.route || '/')
+  const targetRoute = menuItems.value.find(item => item.id === itemId)?.route || '/home'
+  router.push(targetRoute)
 }
 
 // 鼠标进入侧边栏

@@ -18,11 +18,28 @@ from src_v2.core.utils import KahunaException, get_beijing_utctime
 
 
 class Character():
-    def __init__(self, character_id: int, character_name: str, owner_user_name: str, token_expires_date: datetime):
+    def __init__(self, character_id: int, character_name: str, owner_user_name: str, birthday: datetime, access_token: str, refresh_token: str, expires_time: datetime, corporation_id: int, director: bool):
+        """
+        character_id = Column(Integer, primary_key=True)
+            owner_user_name = Column(Text, ForeignKey("user.user_name"))
+            character_name = Column(Text, index=True)
+            birthday = Column(DateTime)
+            access_token = Column(Text)
+            refresh_token = Column(Text)
+            expires_time = Column(DateTime)
+            corporation_id = Column(Integer)
+            director = Column(Boolean)
+        """
+
         self.character_id = character_id
         self.character_name = character_name
         self.owner_user_name = owner_user_name
-        self.token_expires_date = token_expires_date
+        self.birthday = birthday
+        self.access_token = access_token
+        self.refresh_token = refresh_token
+        self.corporation_id = corporation_id
+        self.director = director
+        self.token_expires_date = expires_time
         self._refresh_token_lock = Lock()
 
     async def refresh_character_token(self):
@@ -37,11 +54,30 @@ class Character():
             token_state.access_token = refresh_res_dict['access_token']
             token_state.refresh_token = refresh_res_dict['refresh_token']
             token_state.expires_time = datetime.fromtimestamp(refresh_res_dict["expires_at"]).astimezone(timezone(timedelta(hours=+8), 'Shanghai')).replace(tzinfo=None)
+            
+            character_roles = await eveesi.characters_character_roles(token_state.access_token, self.character_id)
+            director_status = "Director" in character_roles['roles'] if 'roles' in character_roles else None
+            if director_status != token_state.director:
+                token_state.director = director_status
             await EveAuthedCharacterDBUtils.merge(token_state)
 
-            # self.token = refresh_res_dict['access_token']
-            # self.refresh_token = refresh_res_dict['refresh_token']
-            self.token_expires_date = (datetime.fromtimestamp(refresh_res_dict["expires_at"]).astimezone(timezone(timedelta(hours=+8), 'Shanghai')).replace(tzinfo=None))
+            self.access_token = token_state.access_token
+            self.refresh_token = token_state.refresh_token
+            self.token_expires_date = token_state.expires_time
+            self.director = token_state.director
+
+    @classmethod
+    def from_db_obj(cls, db_obj: M_EveAuthedCharacter):
+        return cls(
+            character_id=db_obj.character_id,
+            character_name=db_obj.character_name,
+            owner_user_name=db_obj.owner_user_name,
+            birthday=db_obj.birthday,
+            access_token=db_obj.access_token,
+            refresh_token=db_obj.refresh_token,
+            expires_time=db_obj.expires_time,
+            corporation_id=db_obj.corporation_id,
+            director=db_obj.director)
 
     @property
     async def ac_token(self):

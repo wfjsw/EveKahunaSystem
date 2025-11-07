@@ -23,8 +23,6 @@ class User(PostgreModel):
     user_name = Column(Text, primary_key=True)
     create_date = Column(DateTime)
     password_hash = Column(Text)
-    user_role = Column(Text)
-    user_permission = Column(ARRAY(Text))
 all_model.append(User)
 
 class UserData(PostgreModel):
@@ -41,6 +39,46 @@ class InvitCode(PostgreModel):
     create_date = Column(DateTime)
     used_date = Column(DateTime)
 all_model.append(InvitCode)
+
+class Roles(PostgreModel):
+    __tablename__ = 'roles'
+    role_name = Column(Text, primary_key=True)
+    role_description = Column(Text)
+all_model.append(Roles)
+
+class Permissions(PostgreModel):
+    __tablename__ = 'permissions'
+    permission_name = Column(Text, primary_key=True)
+    permission_description = Column(Text)
+all_model.append(Permissions)
+
+class UserRoles(PostgreModel):
+    __tablename__ = 'user_roles'
+    id = Column(Integer, primary_key=True)
+    user_name = Column(Text, ForeignKey("user.user_name"), index=True)
+    role_name = Column(Text, ForeignKey("roles.role_name"))
+all_model.append(UserRoles)
+
+class RolePermissions(PostgreModel):
+    __tablename__ = 'role_permissions'
+    id = Column(Integer, primary_key=True)
+    role_name = Column(Text, ForeignKey("roles.role_name"), index=True)
+    permission_name = Column(Text, ForeignKey("permissions.permission_name"))
+all_model.append(RolePermissions)
+
+class UserPermissions(PostgreModel):
+    __tablename__ = 'user_permissions'
+    id = Column(Integer, primary_key=True)
+    user_name = Column(Text, ForeignKey("user.user_name"), index=True)
+    permission_name = Column(Text, ForeignKey("permissions.permission_name"))
+all_model.append(UserPermissions)
+
+class RoleHierarchy(PostgreModel):
+    __tablename__ = 'role_hierarchy'
+    id = Column(Integer, primary_key=True)
+    parent_role_name = Column(Text, ForeignKey("roles.role_name"), index=True)
+    child_role_name = Column(Text, ForeignKey("roles.role_name"), index=True)
+all_model.append(RoleHierarchy)
 
 class EveAuthedCharacter(PostgreModel):
     __tablename__ = 'eve_authed_character'
@@ -100,17 +138,21 @@ class EveCorporation(PostgreModel):
     corporation_icon = Column(Text)
 all_model.append(EveCorporation)
 
-class IndustryPlan(PostgreModel):
-    __tablename__ = 'industry_plan'
-    id = Column(Integer, primary_key=True)
-all_model.append(IndustryPlan)
+class EveAssetPullMission(PostgreModel):
+    __tablename__ = 'eve_asset_pull_mission'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_name = Column(Text, ForeignKey("user.user_name"))
+    access_character_id = Column(Integer, ForeignKey("eve_authed_character.character_id"))
+    asset_owner_type = Column(Text)
+    asset_owner_id = Column(Integer)
+    active = Column(Boolean)
+    last_pull_time = Column(DateTime)
+all_model.append(EveAssetPullMission)
 
-class IndustryPlanProdution(PostgreModel):
-    __tablename__ = 'industry_plan_item'
-    id = Column(Integer, primary_key=True)
-all_model.append(IndustryPlanProdution)
+class EveAssetNodeAccess(PostgreModel):
+    __tablename__ = 'eve_asset_node_access'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    asset_owner_type = Column(Text)
+    asset_owner_id = Column(Integer)
+all_model.append(EveAssetNodeAccess)
 
-class IndustryPlanMatcher(PostgreModel):
-    __tablename__ = 'industry_plan_matcher'
-    id = Column(Integer, primary_key=True)
-all_model.append(IndustryPlanMatcher)

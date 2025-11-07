@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ArrowDown } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import smallSideBar from './components/sideBar/smallSideBar.vue'
 
@@ -11,11 +11,6 @@ const handleLogout = () => {
   authStore.logout()
   router.push('/login')
 }
-
-onMounted(async () => {
-  // 应用启动时检查认证状态
-  await authStore.checkAuth()
-})
 </script>
 
 <template>
@@ -23,8 +18,8 @@ onMounted(async () => {
     <!-- 登录页面不显示主布局 -->
     <router-view v-if="$route.name === 'login'" />
     
-    <!-- 主应用布局 -->
-    <el-container v-else>
+    <!-- 主应用布局 - 确保用户信息已加载 -->
+    <el-container v-else-if="authStore.isAuthenticated">
       <!-- 左侧窄侧边菜单 -->
       <smallSideBar />
 

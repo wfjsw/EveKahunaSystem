@@ -1,5 +1,5 @@
 from typing import AnyStr, AsyncGenerator
-from sqlalchemy import delete, select, text, func, distinct
+from sqlalchemy import delete, select, text, func, distinct, or_
 from sqlalchemy.dialects.sqlite import insert as insert
 from sqlalchemy.orm import aliased
 from contextlib import asynccontextmanager
@@ -18,6 +18,23 @@ class _AsyncIteratorWrapper:
         self._generator = generator
         self._session = session
         self._closed = False
+    
+    @classmethod
+    async def from_stmt(cls, stmt):
+        """基于给定的 SQLAlchemy 语句创建会话并返回异步迭代器包装器"""
+        session = dbm._session_maker()  # pyright: ignore[reportOptionalCall]
+        result = await session.execute(stmt)
+
+        async def generator():
+            try:
+                for item in result.scalars():
+                    yield item
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+        return cls(generator(), session)
     
     def __aiter__(self):
         return self
@@ -62,17 +79,6 @@ class _AsyncIteratorWrapper:
 
 class _CommonUtils:
     cls_model = None
-
-    @staticmethod
-    async def _create_result_generator(result, session):
-        """创建结果生成器，处理提交和回滚"""
-        try:
-            for item in result.scalars():
-                yield item
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
 
     @classmethod
     async def insert_many(cls, rows_list):
@@ -127,11 +133,8 @@ class _CommonUtils:
         """返回所有记录的异步迭代器"""
         if not cls.cls_model:
             raise Exception("cls_model is None")
-        session = dbm._session_maker()
         stmt = select(cls.cls_model)
-        result = await session.execute(stmt)
-        async_gen = cls._create_result_generator(result, session)
-        return _AsyncIteratorWrapper(async_gen, session)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
 
     @classmethod
     def get_obj(cls):
@@ -195,7 +198,7 @@ class _CommonCacheUtils:
                 logger.info(f"从 {table_name} 复制到 {cache_table_name} 完成。")
             except Exception as e:
                 print(traceback.format_stack())
-                logger.error(f"从 {table_name} 复制到 {cache_table_name} 失败。")
+                logger.error(f"从 {table_name} 复制到 {cache_table_name} 失败。")  # pyright: ignore[reportUnboundVariable]
                 raise
 
 class UserDBUtils(_CommonUtils):
@@ -244,17 +247,229 @@ class UserDataDBUtils(_CommonUtils):
             stmt = delete(cls.cls_model).where(cls.cls_model.user_name == user_name)
             await session.execute(stmt)
 
+class RolesDBUtils(_CommonUtils):
+    cls_model = model.Roles
+
+    @classmethod
+    async def select_role_by_role_name(cls, role_name: str) -> cls_model | None:
+        async with dbm.get_session() as session:
+            stmt = select(cls.cls_model).where(cls.cls_model.role_name == role_name)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+    
+    @classmethod
+    async def delete_roles_by_role_names(cls, role_names: list[str], session=None):
+        """批量删除角色
+        
+        Args:
+            role_names: 要删除的角色名称列表
+            session: 可选的数据库会话，如果提供则使用该会话，否则创建新会话
+        """
+        if not role_names:
+            return
+        if not session:
+            async with dbm.get_session() as session:
+                stmt = delete(cls.cls_model).where(cls.cls_model.role_name.in_(role_names))
+                await session.execute(stmt)
+        else:
+            stmt = delete(cls.cls_model).where(cls.cls_model.role_name.in_(role_names))
+            await session.execute(stmt)
+
+
+class PermissionsDBUtils(_CommonUtils):
+    cls_model = model.Permissions
+    
+    @classmethod
+    async def select_permission_by_permission_name(cls, permission_name: str):
+        async with dbm.get_session() as session:
+            stmt = select(cls.cls_model).where(cls.cls_model.permission_name == permission_name)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
+class UserRolesDBUtils(_CommonUtils):
+    cls_model = model.UserRoles
+    
+    @classmethod
+    async def delete_user_roles_by_role_names(cls, role_names: list[str], session=None):
+        """批量删除用户角色关联
+        
+        Args:
+            role_names: 要删除的角色名称列表
+            session: 可选的数据库会话，如果提供则使用该会话，否则创建新会话
+        """
+        if not role_names:
+            return
+        if not session:
+            async with dbm.get_session() as session:
+                stmt = delete(cls.cls_model).where(cls.cls_model.role_name.in_(role_names))
+                await session.execute(stmt)
+        else:
+            stmt = delete(cls.cls_model).where(cls.cls_model.role_name.in_(role_names))
+            await session.execute(stmt)
+    
+    @classmethod
+    async def select_user_role_by_user_name_and_role_name(cls, user_name: str, role_name: str):
+        """查询用户角色关联"""
+        async with dbm.get_session() as session:
+            stmt = select(cls.cls_model).where(
+                (cls.cls_model.user_name == user_name) &
+                (cls.cls_model.role_name == role_name)
+            )
+            result = await session.execute(stmt)
+            return result.scalars().first()
+    
+    @classmethod
+    async def select_user_roles_by_user_name(cls, user_name: str):
+        """查询用户的所有角色"""
+        stmt = select(cls.cls_model).where(cls.cls_model.user_name == user_name)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+    @classmethod
+    async def select_user_roles_by_role_name(cls, role_name: str):
+        """查询角色的所有用户"""
+        stmt = select(cls.cls_model).where(cls.cls_model.role_name == role_name)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+class RolePermissionsDBUtils(_CommonUtils):
+    cls_model = model.RolePermissions
+    
+    @classmethod
+    async def delete_role_permissions_by_permission_name(cls, permission_name: str):
+        async with dbm.get_session() as session:
+            stmt = delete(cls.cls_model).where(cls.cls_model.permission_name == permission_name)
+            await session.execute(stmt)
+
+    @classmethod
+    async def select_role_permissions_by_permission_name(cls, permission_name: str):
+        async with dbm.get_session() as session:
+            stmt = select(cls.cls_model).where(cls.cls_model.permission_name == permission_name)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
+    @classmethod
+    async def delete_role_permissions_by_role_names(cls, role_names: list[str], session=None):
+        """批量删除角色权限关联
+        
+        Args:
+            role_names: 要删除的角色名称列表
+            session: 可选的数据库会话，如果提供则使用该会话，否则创建新会话
+        """
+        if not role_names:
+            return
+        if not session:
+            async with dbm.get_session() as session:
+                stmt = delete(cls.cls_model).where(cls.cls_model.role_name.in_(role_names))
+                await session.execute(stmt)
+        else:
+            stmt = delete(cls.cls_model).where(cls.cls_model.role_name.in_(role_names))
+            await session.execute(stmt)
+    
+    @classmethod
+    async def select_role_permission_by_role_name_and_permission_name(cls, role_name: str, permission_name: str):
+        """查询角色权限关联"""
+        async with dbm.get_session() as session:
+            stmt = select(cls.cls_model).where(
+                (cls.cls_model.role_name == role_name) &
+                (cls.cls_model.permission_name == permission_name)
+            )
+            result = await session.execute(stmt)
+            return result.scalars().first()
+    
+    @classmethod
+    async def select_role_permissions_by_role_name(cls, role_name: str):
+        """查询角色的所有权限"""
+        stmt = select(cls.cls_model).where(cls.cls_model.role_name == role_name)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+class RoleHierarchyDBUtils(_CommonUtils):
+    cls_model = model.RoleHierarchy
+
+    @classmethod
+    async def select_all_by_parent_role_name(cls, parent_role_name: str):
+        stmt = select(cls.cls_model).where(cls.cls_model.parent_role_name == parent_role_name)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+    
+    @classmethod
+    async def select_all_by_child_role_name(cls, child_role_name: str):
+        """查询所有以指定角色作为子角色的关系"""
+        stmt = select(cls.cls_model).where(cls.cls_model.child_role_name == child_role_name)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+    
+    @classmethod
+    async def select_parent_roles_by_role_name(cls, role_name: str):
+        """查询角色的所有父角色（返回所有以该角色作为子角色的关系）"""
+        stmt = select(cls.cls_model).where(cls.cls_model.child_role_name == role_name)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+    
+    @classmethod
+    async def select_child_roles_by_role_name(cls, role_name: str):
+        """查询角色的所有子角色（返回所有以该角色作为父角色的关系）"""
+        stmt = select(cls.cls_model).where(cls.cls_model.parent_role_name == role_name)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+    
+    @classmethod
+    async def delete_hierarchy_by_role_names(cls, hierarchy_pairs: list[list[str]], session=None):
+        """批量删除特定的角色层级关系
+        
+        Args:
+            hierarchy_pairs: 要删除的关系对列表，每个元素为 [parent_name, child_name]
+            session: 可选的数据库会话，如果提供则使用该会话，否则创建新会话
+        """
+        if not hierarchy_pairs:
+            return
+        
+        # 构建 OR 条件，匹配所有指定的关系对
+        conditions = []
+        for pair in hierarchy_pairs:
+            if len(pair) != 2:
+                raise ValueError(f"Invalid hierarchy pair: {pair}. Expected [parent_name, child_name]")
+            parent_name, child_name = pair
+            conditions.append(
+                (cls.cls_model.parent_role_name == parent_name) &
+                (cls.cls_model.child_role_name == child_name)
+            )
+        
+        if not conditions:
+            return
+        
+        if not session:
+            async with dbm.get_session() as session:
+                stmt = delete(cls.cls_model).where(or_(*conditions))
+                await session.execute(stmt)
+        else:
+            stmt = delete(cls.cls_model).where(or_(*conditions))
+            await session.execute(stmt)
+
+class UserPermissionsDBUtils(_CommonUtils):
+    cls_model = model.UserPermissions
+    
+    @classmethod
+    async def select_user_permissions_by_user_name(cls, user_name: str):
+        """查询用户的所有权限"""
+        stmt = select(cls.cls_model).where(cls.cls_model.user_name == user_name)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+    @classmethod
+    async def delete_user_permissions_by_permission_name(cls, permission_name: str):
+        async with dbm.get_session() as session:
+            stmt = delete(cls.cls_model).where(cls.cls_model.permission_name == permission_name)
+            await session.execute(stmt)
+
+    @classmethod
+    async def select_user_permissions_by_permission_name(cls, permission_name: str):
+        async with dbm.get_session() as session:
+            stmt = select(cls.cls_model).where(cls.cls_model.permission_name == permission_name)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
 class EveAuthedCharacterDBUtils(_CommonUtils):
     cls_model = model.EveAuthedCharacter
 
     @classmethod
     async def select_all_by_owner_user_name(cls, user_name: AnyStr):
         """根据用户名返回所有角色的异步迭代器"""
-        session = dbm._session_maker()
         stmt = select(cls.cls_model).where(cls.cls_model.owner_user_name == user_name)
-        result = await session.execute(stmt)
-        async_gen = cls._create_result_generator(result, session)
-        return _AsyncIteratorWrapper(async_gen, session)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
 
     @classmethod
     async def delete_character_by_character_id(cls, character_id: int):
@@ -279,11 +494,8 @@ class EveAuthedCharacterDBUtils(_CommonUtils):
     @classmethod
     async def select_all_characters_by_corporation_id(cls, corporation_id: int):
         """根据公司ID返回所有角色的异步迭代器"""
-        session = dbm._session_maker()
         stmt = select(cls.cls_model).where(cls.cls_model.corporation_id == corporation_id)
-        result = await session.execute(stmt)
-        async_gen = cls._create_result_generator(result, session)
-        return _AsyncIteratorWrapper(async_gen, session)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
 
 class EvePublicCharacterInfoDBUtils(_CommonUtils):
     cls_model = model.EvePublicCharacterInfo
@@ -306,7 +518,6 @@ class EvePublicCharacterInfoDBUtils(_CommonUtils):
     @classmethod
     async def select_character_info_by_characterid_with_same_title(cls, character_id: int):
         """根据角色ID返回相同标题的角色信息的异步迭代器"""
-        session = dbm._session_maker()
         # 创建别名用于自连接
         alias = aliased(cls.cls_model)
         # 自连接：通过标题匹配，找到与给定character_id具有相同标题的所有角色
@@ -314,9 +525,7 @@ class EvePublicCharacterInfoDBUtils(_CommonUtils):
             alias, 
             cls.cls_model.title == alias.title
         ).where(alias.character_id == character_id)
-        result = await session.execute(stmt)
-        async_gen = cls._create_result_generator(result, session)
-        return _AsyncIteratorWrapper(async_gen, session)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
 
 class EveCorporationDBUtils(_CommonUtils):
     cls_model = model.EveCorporation
@@ -340,8 +549,25 @@ class EveAliasCharacterDBUtils(_CommonUtils):
 
     @classmethod
     async def select_all_by_main_character_id(cls, main_character_id: int):
+        stmt = select(cls.cls_model).where(cls.cls_model.main_character_id == main_character_id)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+class EveAssetPullMissionDBUtils(_CommonUtils):
+    cls_model = model.EveAssetPullMission
+
+    @classmethod
+    async def select_mission_by_owner_id_and_owner_type(cls, asset_owner_id: int, asset_owner_type: str):
         async with dbm.get_session() as session:
-            stmt = select(cls.cls_model).where(cls.cls_model.main_character_id == main_character_id)
+            stmt = select(cls.cls_model).where(cls.cls_model.asset_owner_id == asset_owner_id and cls.cls_model.asset_owner_type == asset_owner_type)
             result = await session.execute(stmt)
-            async_gen = cls._create_result_generator(result, session)
-            return _AsyncIteratorWrapper(async_gen, session)
+            return result.scalars().first()
+
+    @classmethod
+    async def select_all_by_owner_id_and_owner_type(cls, asset_owner_id: int, asset_owner_type: str):
+        stmt = select(cls.cls_model).where(cls.cls_model.asset_owner_id == asset_owner_id and cls.cls_model.asset_owner_type == asset_owner_type)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+    @classmethod
+    async def select_all_by_user_name(cls, user_name: str):
+        stmt = select(cls.cls_model).where(cls.cls_model.user_name == user_name).order_by(cls.cls_model.id)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)

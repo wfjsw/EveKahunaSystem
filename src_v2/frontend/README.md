@@ -40,3 +40,6 @@ npm run lint
 
 ## 开发笔记
  - 在vite.config.ts中定义api代理，实现前端和后端分开调试
+
+## 使用的资产
+ - https://element-plus.org/zh-CN/component/overview

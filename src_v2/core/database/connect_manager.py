@@ -10,6 +10,8 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy import event
 from win32gui import PostThreadMessage
 
+from neo4j import AsyncGraphDatabase
+
 from redis.asyncio import Redis
 
 from ..config.config import config
@@ -158,6 +160,111 @@ class PostgreDatabaseManager():
             logger.error(f"删除表 {table_name} 失败: {e}")
             raise
 
+    async def _fix_sequence_for_table(self, conn, table_name: str, model_class):
+        """
+        检查并修复表的自增主键序列
+        
+        Args:
+            conn: 数据库连接对象
+            table_name: 表名
+            model_class: 模型类
+        """
+        # 查找自增主键列
+        autoincrement_pk_cols = [
+            col for col in model_class.__table__.columns
+            if col.primary_key and col.autoincrement
+        ]
+        
+        if not autoincrement_pk_cols:
+            return
+        
+        for col in autoincrement_pk_cols:
+            col_name = col.name
+            sequence_name = f"{table_name}_{col_name}_seq"
+            
+            # 使用保存点来隔离序列修复操作，避免影响主事务
+            # 保存点名称使用简化的格式，避免特殊字符问题
+            savepoint_name = f"sp_{table_name[:20]}_{col_name}"
+            savepoint_created = False
+            try:
+                # 创建保存点
+                await conn.execute(text(f"SAVEPOINT {savepoint_name}"))
+                savepoint_created = True
+                
+                # 检查序列是否存在
+                check_sequence_query = text("""
+                    SELECT EXISTS (
+                        SELECT 1 FROM pg_sequences 
+                        WHERE schemaname = 'public' AND sequencename = :seq_name
+                    )
+                """)
+                result = await conn.execute(check_sequence_query, {"seq_name": sequence_name})
+                sequence_exists = result.scalar()
+                
+                # 检查列的默认值是否使用序列
+                check_default_query = text("""
+                    SELECT column_default 
+                    FROM information_schema.columns 
+                    WHERE table_name = :table_name AND column_name = :col_name
+                """)
+                result = await conn.execute(check_default_query, {
+                    "table_name": table_name,
+                    "col_name": col_name
+                })
+                default_value = result.scalar()
+                
+                # 检查默认值是否包含 nextval（PostgreSQL 序列函数）
+                has_sequence_default = default_value and 'nextval' in str(default_value).lower()
+                
+                # 如果序列不存在或默认值不正确，需要修复
+                if not sequence_exists or not has_sequence_default:
+                    # 创建序列
+                    if not sequence_exists:
+                        # 获取当前最大值
+                        max_val_query = text(f'SELECT COALESCE(MAX("{col_name}"), 0) FROM "{table_name}"')
+                        max_result = await conn.execute(max_val_query)
+                        max_val = max_result.scalar() or 0
+                        
+                        # 创建序列，起始值为当前最大值+1
+                        create_seq_sql = text(
+                            f"CREATE SEQUENCE IF NOT EXISTS {sequence_name} "
+                            f"START WITH {max_val + 1}"
+                        )
+                        await conn.execute(create_seq_sql)
+                        logger.info(f"已为表 {table_name} 的列 {col_name} 创建序列 {sequence_name}")
+                    
+                    # 设置列的默认值为序列的 nextval
+                    alter_col_sql = text(
+                        f'ALTER TABLE "{table_name}" '
+                        f'ALTER COLUMN "{col_name}" '
+                        f'SET DEFAULT nextval(\'{sequence_name}\')'
+                    )
+                    await conn.execute(alter_col_sql)
+                    logger.info(f"已为表 {table_name} 的列 {col_name} 设置序列默认值")
+                    
+                    # 确保序列拥有者为表
+                    owner_sql = text(f"ALTER SEQUENCE {sequence_name} OWNED BY \"{table_name}\".\"{col_name}\"")
+                    await conn.execute(owner_sql)
+                    logger.info(f"已设置序列 {sequence_name} 的拥有者")
+                
+                # 释放保存点
+                if savepoint_created:
+                    await conn.execute(text(f"RELEASE SAVEPOINT {savepoint_name}"))
+                
+            except Exception as e:
+                # 回滚到保存点，不影响主事务
+                if savepoint_created:
+                    try:
+                        await conn.execute(text(f"ROLLBACK TO SAVEPOINT {savepoint_name}"))
+                        logger.warning(f"修复表 {table_name} 的列 {col_name} 序列失败，已回滚: {e}")
+                    except Exception as rollback_error:
+                        # 如果回滚也失败，记录错误但不抛出异常
+                        logger.error(f"回滚保存点失败: {rollback_error}")
+                else:
+                    # 如果保存点创建失败，只记录警告
+                    logger.warning(f"无法创建保存点修复表 {table_name} 的列 {col_name} 序列: {e}")
+                # 不抛出异常，允许继续执行其他表的处理
+
     async def create_default_table(self, conn, base_class: Type[DeclarativeMeta]):
         """
         创建默认表结构，自动检查和同步表结构
@@ -188,7 +295,9 @@ class PostgreDatabaseManager():
                     logger.info(f"表 {table_name} 结构不一致，将重建")
                     tables_to_recreate.append((table_name, model_class))
                 else:
-                    logger.info(f"表 {table_name} 结构一致，跳过")
+                    logger.info(f"表 {table_name} 结构一致，检查序列配置")
+                    # 即使结构一致，也要检查并修复序列配置
+                    await self._fix_sequence_for_table(conn, table_name, model_class)
             else:
                 # 表不存在，需要创建
                 logger.info(f"表 {table_name} 不存在，将创建")
@@ -447,6 +556,180 @@ class RedisDatabaseManager():
         if not self._redis:
             raise RuntimeError("Redis 未初始化，请先调用 init() 方法")
         return self._redis
+class Neo4jDatabaseManager():
+    def __init__(self):
+        self._neo4j = None
+    
+    async def init(self):
+        host = os.getenv('NEO4J_HOST') or config.get('NEO4J', 'Host', fallback='localhost')
+        port = int(os.getenv('NEO4J_PORT', 0)) or config.getint('NEO4J', 'Port', fallback=7687)
+        username = os.getenv('NEO4J_USERNAME') or config.get('NEO4J', 'Username', fallback='neo4j')
+        password = os.getenv('NEO4J_PASSWORD') or config.get('NEO4J', 'Password', fallback='neo4j')
 
+        self._neo4j = AsyncGraphDatabase.driver(
+            f'bolt://{host}:{port}',
+            auth=(username, password)
+        )
+        
+        # 验证连接
+        await self.verify_connectivity()
+        logger.info(f"Neo4j 连接成功: {host}:{port}")
+
+        await self.clean_all()
+        # 初始化数据库模式（创建索引和约束）
+        from .neo4j_model_manager import neo4j_model_manager
+        await neo4j_model_manager.init_schema()
+
+    async def verify_connectivity(self):
+        """验证连接是否可用"""
+        try:
+            await self._neo4j.verify_connectivity()
+        except Exception as e:
+            logger.error(f"Neo4j 连接验证失败: {e}")
+            raise
+
+    @property
+    def neo4j(self):
+        if not self._neo4j:
+            raise RuntimeError("Neo4j 未初始化，请先调用 init() 方法")
+        return self._neo4j
+
+    @asynccontextmanager
+    async def get_session(self):
+        """获取 Neo4j 会话（异步上下文管理器）"""
+        if not self._neo4j:
+            raise RuntimeError("Neo4j 未初始化，请先调用 init() 方法")
+        
+        session = self._neo4j.session()
+        try:
+            yield session
+        finally:
+            await session.close()
+
+    @asynccontextmanager
+    async def get_transaction(self):
+        """获取 Neo4j 事务（异步上下文管理器）"""
+        async with self.get_session() as session:
+            tx = await session.begin_transaction()
+            try:
+                yield tx
+                await tx.commit()
+            except Exception:
+                await tx.rollback()
+                raise
+            finally:
+                await tx.close()
+
+    async def close(self):
+        """关闭 Neo4j 连接"""
+        if self._neo4j:
+            await self._neo4j.close()
+            logger.info("Neo4j 连接已关闭")
+
+    async def clean_all_data(self):
+        """清理所有数据（节点和关系）"""
+        async with self.get_transaction() as tx:
+            result = await tx.run("MATCH (n) DETACH DELETE n RETURN count(n) as deleted_count")
+            record = await result.single()
+            deleted_count = record["deleted_count"] if record else 0
+            logger.info(f"Neo4j 已清理所有数据，删除 {deleted_count} 个节点")
+            return deleted_count
+
+    async def clean_all_indexes(self):
+        """清理所有索引（不包括由约束拥有的索引）"""
+        async with self.get_session() as session:
+            # 获取所有索引
+            query = "SHOW INDEXES"
+            result = await session.run(query)
+
+            # 仅收集不属于约束的索引
+            indexes = []
+            async for record in result:
+                index_name = record.get("name")
+                owning_constraint = record.get("owningConstraint")
+                # 只删除独立索引；由约束拥有的索引需要通过删除约束来移除
+                if index_name and not owning_constraint:
+                    indexes.append(index_name)
+
+            if not indexes:
+                logger.info("Neo4j 没有找到需要删除的独立索引")
+                return 0
+
+            # 删除所有独立索引
+            async with self.get_transaction() as tx:
+                deleted_count = 0
+                for index_name in indexes:
+                    try:
+                        await tx.run(f"DROP INDEX {index_name} IF EXISTS")
+                        deleted_count += 1
+                        logger.info(f"删除索引: {index_name}")
+                    except Exception as e:
+                        logger.warning(f"删除索引失败 {index_name}: {e}")
+
+                logger.info(f"Neo4j 已删除 {deleted_count} 个独立索引")
+                return deleted_count
+
+    async def clean_all_constraints(self):
+        """清理所有约束"""
+        async with self.get_session() as session:
+            # 获取所有约束
+            query = "SHOW CONSTRAINTS"
+            result = await session.run(query)
+            
+            constraints = []
+            async for record in result:
+                constraint_name = record.get("name")
+                if constraint_name:
+                    constraints.append(constraint_name)
+            
+            if not constraints:
+                logger.info("Neo4j 没有找到需要删除的约束")
+                return 0
+            
+            # 删除所有约束
+            async with self.get_transaction() as tx:
+                deleted_count = 0
+                for constraint_name in constraints:
+                    try:
+                        await tx.run(f"DROP CONSTRAINT {constraint_name} IF EXISTS")
+                        deleted_count += 1
+                        logger.info(f"删除约束: {constraint_name}")
+                    except Exception as e:
+                        logger.warning(f"删除约束失败 {constraint_name}: {e}")
+                
+                logger.info(f"Neo4j 已删除 {deleted_count} 个约束")
+                return deleted_count
+
+    async def clean_all(self):
+        """清理所有数据、约束和索引（谨慎使用）"""
+        logger.warning("开始清理 Neo4j 数据库的所有数据、索引和约束...")
+        
+        # 1. 清理所有数据
+        deleted_nodes = await self.clean_all_data()
+        
+        # 2. 清理所有约束（先删除约束，再删除剩余索引）
+        deleted_constraints = await self.clean_all_constraints()
+
+        # 3. 清理所有独立索引
+        deleted_indexes = await self.clean_all_indexes()
+        
+        logger.warning(
+            f"Neo4j 数据库清理完成："
+            f"删除 {deleted_nodes} 个节点, "
+            f"删除 {deleted_indexes} 个索引, "
+            f"删除 {deleted_constraints} 个约束"
+        )
+        
+        return {
+            "nodes_deleted": deleted_nodes,
+            "indexes_deleted": deleted_indexes,
+            "constraints_deleted": deleted_constraints
+        }
+
+    async def clean_all_index(self):
+        """清理所有索引（兼容旧方法名）"""
+        return await self.clean_all_indexes()
+
+neo4j_manager = Neo4jDatabaseManager()
 postgres_manager = PostgreDatabaseManager()
 redis_manager = RedisDatabaseManager()

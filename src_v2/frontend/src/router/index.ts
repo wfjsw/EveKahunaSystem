@@ -13,6 +13,10 @@ const router = createRouter({
     },
     {
       path: '/',
+      redirect: '/home'
+    },
+    {
+      path: '/home',
       name: 'home',
       component: HomeView,
       meta: { requiresAuth: true }
@@ -73,6 +77,11 @@ const router = createRouter({
           name: 'workflow',
           component: () => import('../views/industry/workflow.vue'),
         },
+        {
+          path: 'testPage',
+          name: 'testPage',
+          component: () => import('../views/industry/testPage.vue'),
+        },
       ],
     },
     {
@@ -86,6 +95,23 @@ const router = createRouter({
       component: () => import('../views/utilsView.vue'),
     },
     {
+      path: '/admin',
+      name: 'admin',
+      component: () => import('../views/adminView.vue'),
+      children: [
+        {
+          path: 'userManagement',
+          name: 'userManagement',
+          component: () => import('../views/admin/userManagement.vue'),
+        },
+        {
+          path: 'permissionManagement',
+          name: 'permissionManagement',
+          component: () => import('../views/admin/permissionManagement.vue'),
+        },
+      ],
+    },
+    {
       path: '/forbidden',
       name: 'forbidden',
       component: () => import('../views/ForbiddenView.vue'),
@@ -95,7 +121,7 @@ const router = createRouter({
       path: '/setting/characterSetting/auth/close',
       name: 'characterAuthClose',
       component: () => import('../views/setting/characterAuthClose.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: false }
     }
   ],
 })

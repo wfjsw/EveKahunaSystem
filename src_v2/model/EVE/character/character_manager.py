@@ -32,26 +32,14 @@ from src_v2.core.utils.path import DOWNLOAD_RESOURCE_PATH
 from src_v2.model.EVE.character import character
 
 class CharacterManager(metaclass=SingletonMeta):
-    def __init__(self):
-        self.init_status = False
-        self.character_dict: dict = dict()
+    async def get_character_by_character_id(self, character_id: int) -> Character:
+        character_db_obj = await EveAuthedCharacterDBUtils.select_character_by_character_id(character_id)
+        if not character_db_obj:
+            raise KahunaException("角色不存在")
 
-    async def init(self):
-        await self.init_character_dict()
-
-    async def init_character_dict(self):
-        if not self.init_status:
-            async for character in await EveAuthedCharacterDBUtils.select_all():
-                character_obj = Character(
-                    character_id=character.character_id,
-                    character_name=character.character_name,
-                    owner_user_name=character.owner_user_name,
-                    token_expires_date=character.expires_time
-                )
-                self.character_dict[character.character_id] = character_obj
-            logger.info(f"初始化角色 {len(self.character_dict)} 个.")
-
-        logger.info(f"init character dict complete. {id(self)}")
+        character = Character.from_db_obj(character_db_obj)
+        await character.ac_token
+        return character
 
     async def get_corporation_data_by_corporation_id(self, corporation_id: int) -> M_EveCorporation:
         corp_onj = await EveCorporationDBUtils.select_corporation_by_corporation_id(
@@ -61,7 +49,7 @@ class CharacterManager(metaclass=SingletonMeta):
             corporation = await eveesi.corporations_corporation_id(corporation_id)
             corp_onj = M_EveCorporation(
                 corporation_id=corporation_id,
-                alliance_id=corporation['alliance_id'],
+                alliance_id=corporation['alliance_id'] if 'alliance_id' in corporation else None,
                 ceo_id=corporation['ceo_id'],
                 creator_id=corporation['creator_id'],
                 date_founded=parse_iso_datetime(corporation['date_founded']).replace(tzinfo=None) if 'date_founded' in corporation else None,
@@ -108,16 +96,6 @@ class CharacterManager(metaclass=SingletonMeta):
                         .astimezone(timezone(timedelta(hours=+8), 'Shanghai'))
                         .replace(tzinfo=None))
 
-        if character_id not in self.character_dict:
-            character = Character(
-                character_id=character_id,
-                character_name=character_name,
-                owner_user_name=user_name,
-                token_expires_date=expires_time
-            )
-        else:
-            raise KahunaException("character already exists.")
-
         character_db_obj = M_EveAuthedCharacter(
             character_id=character_id,
             owner_user_name=user_name,
@@ -130,10 +108,10 @@ class CharacterManager(metaclass=SingletonMeta):
             # director="Director" in character_roles['roles'] if 'roles' in character_roles else None,
         )
         await EveAuthedCharacterDBUtils.save_obj(character_db_obj)
+        character = Character.from_db_obj(character_db_obj)
         character_roles = await eveesi.characters_character_roles(character.ac_token, character_id)
         character_db_obj.director = "Director" in character_roles['roles'] if 'roles' in character_roles else None
         await EveAuthedCharacterDBUtils.merge(character_db_obj)
-        self.character_dict[character_id] = character
 
         return character
 
@@ -144,12 +122,10 @@ class CharacterManager(metaclass=SingletonMeta):
         return characters_of_user_list
 
     async def delete_character_by_character_name(self, character_name: str, owner_user_name: str):
-        for character in self.character_dict.values():
-            if character.character_name == character_name and character.owner_user_name == owner_user_name:
-                await EveAuthedCharacterDBUtils.delete_character_by_character_id(character.character_id)
-                self.character_dict.pop(character.character_id)
-                return
-        raise KahunaException("角色不存在")
+        character_db_obj = await EveAuthedCharacterDBUtils.select_character_by_character_name(character_name)
+        if not character_db_obj:
+            raise KahunaException("角色不存在")
+        await EveAuthedCharacterDBUtils.delete_obj(character_db_obj)
 
     async def delete_all_alias_characters_of_main_character(self, main_character_id: int):
         async for alias_character in await EveAliasCharacterDBUtils.select_all_by_main_character_id(main_character_id):
@@ -157,35 +133,19 @@ class CharacterManager(metaclass=SingletonMeta):
 
     async def delete_all_character_of_user(self, owner_user_name: str):
         async for character in await EveAuthedCharacterDBUtils.select_all_by_owner_user_name(owner_user_name):
-            await EveAuthedCharacterDBUtils.delete_character_by_character_id(character.character_id)
-            self.character_dict.pop(character.character_id)
+            await EveAuthedCharacterDBUtils.delete_obj(character)
 
     async def update_director_status(self, character_id: int):
         character_db_obj = await EveAuthedCharacterDBUtils.select_character_by_character_id(character_id)
         if not character_db_obj:
             raise KahunaException("角色不存在")
 
-        character = self.character_dict[character_id]
-        character_roles = await eveesi.characters_character_roles(character.ac_token, character.character_id)
-        director_status = "Director" in character_roles['roles'] if 'roles' in character_roles else None
-        if director_status != character.director:
-            character.director = director_status
-            await EveAuthedCharacterDBUtils.save_obj(character)
-
-    async def get_character_by_character_id(self, character_id: int):
-        character_db_obj = await EveAuthedCharacterDBUtils.select_character_by_character_id(character_id)
-        if not character_db_obj:
-            raise KahunaException("角色不存在")
-        
-        # update_director_status
-        character = self.character_dict[character_id]
+        character = Character.from_db_obj(character_db_obj)
         character_roles = await eveesi.characters_character_roles(character.ac_token, character.character_id)
         director_status = "Director" in character_roles['roles'] if 'roles' in character_roles else None
         if director_status != character_db_obj.director:
             character_db_obj.director = director_status
-            await EveAuthedCharacterDBUtils.save_obj(character_db_obj)
-
-        return character_db_obj
+            await EveAuthedCharacterDBUtils.merge(character_db_obj)
 
     async def get_character_by_character_name(self, character_name: str):
         character = await EveAuthedCharacterDBUtils.select_character_by_character_name(character_name)

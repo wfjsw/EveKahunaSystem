@@ -76,15 +76,14 @@ async def login():
         user = await UserManager().get_user(username)
         if not user:
             raise KeyError
-        token = create_token(username, user.user_role)
+        token = create_token(username, ",".join(await user.roles))
 
         return jsonify({
             'token': token,
             'user': {
                 'id': username,
                 'username': username,
-                'role': user.user_role,
-                'permission': user.user_permission
+                'roles': await user.roles
             }
         })
     except Exception as e:
@@ -97,12 +96,13 @@ async def get_current_user():
     """获取当前用户信息"""
     user_id = g.current_user['user_id']
     user = await UserManager().get_user(user_id)
-    
+    if not user:
+        return jsonify({'error': '用户不存在'}), 404
+
     return jsonify({
-        'id': user_id,
-        'username': user_id,
-        'role': user.user_role,
-        'permission': user.user_permission
+        'id': user.user_name,
+        'username': user.user_name,
+        'roles': await user.roles,
     })
 
 @api_auth_bp.route('/logout', methods=['POST'])

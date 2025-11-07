@@ -131,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
@@ -222,7 +222,9 @@ const handleLogin = async () => {
   
     if (result.success) {
       ElMessage.success('登录成功')
-      router.push('/')
+      // 等待下一个 tick，确保状态更新完成
+      await nextTick()
+      router.push('/home')
     } else {
       ElMessage.error(result.error || '登录失败')
     }

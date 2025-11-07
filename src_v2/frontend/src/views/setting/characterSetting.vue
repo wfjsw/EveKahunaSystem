@@ -102,7 +102,7 @@ const wrapEsiAuth = async () => {
 
 const characterList = ref<Character[]>([])
 const mainCharacter = ref<number | string>('')
-
+const isCorpDirector = ref(false)
 const getCharacterList = async () => {
   try {
     const response = await http.get('/user/list')
@@ -157,10 +157,12 @@ const handleSetMainCharacter = async () => {
     const response = await http.post(`/user/setMainCharacter`, {
       characterName: characterName
     })
+    const data = await response.json()
     if (response.ok) {
       ElMessage.success('主角色设置成功')
       getCharacterList()
       getIsAliasCharacterSettingAvaliable()
+      isCorpDirector.value = data?.director || false
     } else {
       ElMessage.error('主角色设置失败')
       mainCharacter.value = ''
@@ -175,6 +177,7 @@ const getMainCharacter = async () => {
   const response = await http.get('/user/getMainCharacter')
   const data = await response.json()
   mainCharacter.value = data?.mainCharacter || ''
+  isCorpDirector.value = data?.director || false
 }
 
 const aliasCharacterSettingAvaliable = ref(false)
@@ -197,10 +200,18 @@ const getAliasCharacterList = async () => {
   aliasCharacterList.value = data || []
 }
 
+const getSameTitleAliasCharacterListLoading = ref(false)
 const getSameTitleAliasCharacterList = async () => {
+  if (getSameTitleAliasCharacterListLoading.value) {
+    ElMessage.warning('正在获取中，请耐心等待')
+    return
+  }
+  getSameTitleAliasCharacterListLoading.value = true
+  await new Promise(resolve => setTimeout(resolve, 10000))
   const response = await http.post('/user/getSameTitleAliasCharacterList')
   const data = await response.json()
   aliasCharacterList.value = data || []
+  getSameTitleAliasCharacterListLoading.value = false
 }
 
 const addNewCharacterProcess = ref(false)
@@ -326,6 +337,8 @@ const handleSaveAliasCharacters = async () => {
     ElMessage.error(error?.message || '保存失败')
   }
 }
+
+import { Eleme } from '@element-plus/icons-vue'
 </script>
 
 <template>
@@ -341,6 +354,10 @@ const handleSaveAliasCharacters = async () => {
             <el-select v-model="mainCharacter" placeholder="选择角色" style="width: 100%" @change="handleSetMainCharacter">
               <el-option v-for="item in characterList" :key="item.name || 'empty'" :label="item.name || '请选择'" :value="item.name" />
             </el-select>
+            <div v-if="isCorpDirector">
+              <span>拥有总监权限</span>
+              <el-icon color="green" size="18"><SuccessFilled /></el-icon>
+            </div>
           </el-col>
         </el-row>
       </div>
@@ -384,10 +401,11 @@ const handleSaveAliasCharacters = async () => {
         >
         <template #left-footer>
           <el-tooltip content="获取同title角色" placement="top">
-            <el-button class="transfer-footer" size="medium" @click="getSameTitleAliasCharacterList"><el-icon><RefreshRight /></el-icon></el-button>
+            <el-button v-if="!getSameTitleAliasCharacterListLoading" class="transfer-footer" size="small" @click="getSameTitleAliasCharacterList"><el-icon><RefreshRight /></el-icon></el-button>
+            <el-button v-else disabled class="transfer-footer" size="small"><el-icon><Eleme /></el-icon></el-button>
           </el-tooltip>
           <el-tooltip content="添加新角色" placement="top">
-            <el-button class="transfer-footer" size="medium" @click="addNewCharacterProcess = true"><el-icon><Plus /></el-icon></el-button>
+            <el-button class="transfer-footer" size="small" @click="addNewCharacterProcess = true"><el-icon><Plus /></el-icon></el-button>
           </el-tooltip>
 
           <el-dialog 
@@ -451,7 +469,7 @@ const handleSaveAliasCharacters = async () => {
         <template #right-footer>
           <el-button 
             class="transfer-footer" 
-            size="medium"
+            size="small"
             @click="handleSaveAliasCharacters"
           >
             保存

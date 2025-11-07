@@ -4,8 +4,9 @@ from src.service.log_server import logger
 import traceback
 
 from src_v2.core.user.user_manager import UserManager
+from src_v2.model.EVE.character.character import Character
 from src_v2.model.EVE.character.character_manager import CharacterManager
-from src_v2.core.database.kahuna_database_utils_v2 import EvePublicCharacterInfoDBUtils
+from src_v2.core.database.kahuna_database_utils_v2 import EvePublicCharacterInfoDBUtils, EveAuthedCharacterDBUtils
 from src_v2.core.database.model import EveAliasCharacter as M_EveAliasCharacter
 from src_v2.core.database.kahuna_database_utils_v2 import EveAliasCharacterDBUtils
 from src_v2.model.EVE.eveesi import eveesi
@@ -54,11 +55,12 @@ async def get_main_character():
     try:
         user_id = g.current_user["user_id"]
         main_character_id = await UserManager().get_main_character_id(user_id)
-        if main_character_id in CharacterManager().character_dict:
-            main_character = CharacterManager().character_dict[main_character_id]
-            return jsonify({"mainCharacter": main_character.character_name})
+        main_character = await CharacterManager().get_character_by_character_id(main_character_id)
+        if main_character.director:
+            director = True
         else:
-            raise KahunaException("发生异常，请联系管理员")
+            director = False
+        return jsonify({"mainCharacter": main_character.character_name, "director": director})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -70,8 +72,14 @@ async def set_main_character():
     character_name = data.get("characterName")
     try:
         await UserManager().set_main_character(user_id, character_name)
-
-        return jsonify({"message": "主角色设置成功"})
+        character_obj = await EveAuthedCharacterDBUtils.select_character_by_character_name(character_name)
+        character = Character.from_db_obj(character_obj)
+        await character.refresh_character_token()
+        if character.director:
+            director = True
+        else:
+            director = False
+        return jsonify({"message": "主角色设置成功", "director": director})
     except Exception as e:
         logger.error(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
@@ -104,7 +112,7 @@ async def get_same_title_alias_character_list():
     try:
         main_character_id = await UserManager().get_main_character_id(user_id)
         main_character = await CharacterManager().get_character_by_character_id(main_character_id)
-        await CharacterManager().refresh_all_public_characters_info_of_corporation(CharacterManager().character_dict[main_character_id].ac_token, main_character.corporation_id)
+        await CharacterManager().refresh_all_public_characters_info_of_corporation(main_character.ac_token, main_character.corporation_id)
 
         same_title_character_list = []
         async for character in await EvePublicCharacterInfoDBUtils.select_character_info_by_characterid_with_same_title(main_character_id):
@@ -170,7 +178,8 @@ async def search_character():
                 return jsonify({"error": f"搜索失败: {str(e)}"}), 500
         else:  # characterName
             main_character_id = await UserManager().get_main_character_id(user_id)
-            search_result = await eveesi.search(CharacterManager().character_dict[main_character_id].ac_token, main_character_id, ["character"], input_value)
+            main_character = await CharacterManager().get_character_by_character_id(main_character_id)
+            search_result = await eveesi.search(main_character.ac_token, main_character.character_id, ["character"], input_value)
             if search_result:
                 character_id_list = search_result.get("character", [])
                 for character_id in character_id_list:

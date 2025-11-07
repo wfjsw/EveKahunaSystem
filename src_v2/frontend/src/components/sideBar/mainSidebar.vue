@@ -55,7 +55,6 @@ const toggleActive = (itemId: number) => {
   --el-menu-text-color: #303133; /* 文字颜色 */
   --el-menu-active-color: #ffffff; /* 激活状态文字颜色 */
   --el-menu-item-font-size: 18px;
-
   
   border-radius: 12px;
 }

@@ -116,8 +116,11 @@ class HttpService {
     })
   }
 
-  async delete(endpoint: string) {
-    return this.request(endpoint, { method: 'DELETE' })
+  async delete(endpoint: string, data?: any) {
+    return this.request(endpoint, {
+      method: 'DELETE',
+      body: data !== undefined ? JSON.stringify(data) : undefined
+    })
   }
 }
 

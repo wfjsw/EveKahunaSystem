@@ -7,7 +7,7 @@ export interface User {
   id: string
   username: string
   email: string
-  role: string
+  roles: string[]
 }
 
 export interface LoginCredentials {
@@ -72,7 +72,7 @@ export const useAuthStore = defineStore('auth', () => {
   // 短时缓存：仅存于内存，避免被持久篡改（5分钟）
   const lastAuthCheckAtMs = ref<number | null>(null)
   const lastAuthCheckResult = ref<boolean>(false)
-  const AUTH_CACHE_TTL_MS = 5 * 60 * 1000
+  const AUTH_CACHE_TTL_MS = 30 * 1000
 
   // -------------------- 计算属性（getter） --------------------
   /**
@@ -84,9 +84,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * userRole: 当前用户的角色（如 'admin'、'user'），未登录时为 'guest'。
-   * 方便在页面或路由守卫中做权限判断。
+   * 仅用作显示，不作为权限判断依据。
    */
-  const userRole = computed(() => user.value?.role || 'guest')
+  const userRoles = computed(() => user.value?.roles || [])
 
   // -------------------- 方法（action） --------------------
   /**
@@ -114,6 +114,10 @@ export const useAuthStore = defineStore('auth', () => {
       token.value = data.token
       user.value = data.user
       localStorage.setItem('auth_token', data.token)
+      
+      // 设置认证缓存，避免登录后立即跳转时再次验证
+      lastAuthCheckAtMs.value = Date.now()
+      lastAuthCheckResult.value = true
 
       return { success: true }
     } catch (err) {
@@ -203,7 +207,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // 计算属性
     isAuthenticated,
-    userRole,
+    userRoles,
 
     // 方法
     login,
