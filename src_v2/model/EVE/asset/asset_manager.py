@@ -1,9 +1,12 @@
 
 import asyncio
 from datetime import datetime, timezone, timedelta
+import pathlib
 
-from src_v2.core.database.connect_manager import redis_manager
-from src_v2.core.utils import SingletonMeta
+from tqdm.std import tqdm
+
+from src_v2.core.database.connect_manager import redis_manager, neo4j_manager
+from src_v2.core.utils import SingletonMeta, tqdm_manager
 from src_v2.core.utils import KahunaException, get_beijing_utctime
 
 from src_v2.model.EVE.character.character_manager import CharacterManager
@@ -13,7 +16,8 @@ from src_v2.core.database.kahuna_database_utils_v2 import EveAssetPullMissionDBU
 from src_v2.core.database.model import EveAssetPullMission as M_EveAssetPullMission
 
 from src_v2.core.database.neo4j_models import Asset
-from src_v2.core.database.neo4j_utils import Neo4jAssetUtils
+from src_v2.core.database.neo4j_utils import Neo4jAssetUtils as NAU
+from src_v2.core.database.neo4j_utils import Neo4jIndustryUtils as NIU
 
 from src_v2.model.EVE.sde.utils import SdeUtils
 
@@ -21,6 +25,8 @@ from src_v2.model.EVE.eveesi import eveesi
 
 # kahuna logger
 from src_v2.core.log import logger
+
+CREATE_STATION_SEMAPHORE = asyncio.Semaphore(1)
 
 structure_sub_location_flags = [
     "OfficeFolder",
@@ -118,78 +124,183 @@ class AssetManager(metaclass=SingletonMeta):
         )
         await EveAssetPullMissionDBUtils.save_obj(mission_obj)
 
-    async def processing_asset_pull_mission(self, mission_obj: M_EveAssetPullMission):
-        if mission_obj.asset_owner_type == 'character':
-            pull_function = eveesi.characters_character_assets
+    async def get_station_info(self, station_id: int):
+        # 上级为空间站是NPC空间站，需要补充创建星系
+        # 获取缓存
+        station_info_cache = await redis_manager.redis.hgetall(f'eveesi:universe_stations_station:{station_id}')
+        if not station_info_cache:
+            station_info = await eveesi.universe_stations_station(station_id)
+            station_info_cache = {
+                "name": station_info["name"],
+                "system_id": station_info["system_id"],
+            }
+            await redis_manager.redis.hset(f'eveesi:universe_stations_station:{station_id}', mapping=station_info_cache)
+            await redis_manager.redis.expire(f'eveesi:universe_stations_station:{station_id}', 60*60*24)
+        else:
+            station_info = station_info_cache
+            return station_info, False
 
-        elif mission_obj.asset_owner_type == 'corp':
-            pull_function = eveesi.corporations_corporation_assets
+        return station_info, True
 
-        access_character = await CharacterManager().get_character_by_character_id(mission_obj.access_character_id)
-        assets = await pull_function(access_character.ac_token, mission_obj.asset_owner_id)
+    async def create_station_node(self, station_id: int):
+        async with CREATE_STATION_SEMAPHORE:
+            station_info, is_new = await self.get_station_info(station_id)
+            if not is_new:
+                return
+            system_info = SdeUtils.get_system_info_by_id(station_info["system_id"])
+            station_node = {
+                'station_id': station_id,
+                'station_name': station_info["name"],
+                'system_id': station_info["system_id"],
+                'system_name': system_info['system_name'],
+            }
+            await NIU.merge_node(
+                "Station",
+                {
+                    "station_id": station_id,
+                },
+                station_node
+            )
 
-        for assets_list_batch in assets:
-            for asset in assets_list_batch[:]:
+            system_node = {
+                'system_id': system_info['system_id'],
+                'system_name': system_info['system_name'],
+                'region_id': system_info['region_id'],
+                'region_name': system_info['region_name'],
+            }
+            await NIU.merge_node(
+                "SolarSystem",
+                {
+                    "solar_system_id": system_info["system_id"],
+                },
+                system_node
+            )
+
+            await NIU.link_node(
+                "Station",
+                {"station_id": station_id},
+                {},
+                "LOCATED_IN",
+                {},
+                {},
+                "SolarSystem",
+                {"solar_system_id": system_info['system_id']},
+                {}
+            )
+
+    async def _generate_all_nodes(self, assets_list: list[dict], mission_obj: M_EveAssetPullMission):
+        stucture_list = await NAU.get_structure_nodes()
+        structure_item_id_list = [structure.get("item_id", None) for structure in stucture_list]
+        async def generate_with_semaphore(asset: dict):
+            async with neo4j_manager.semaphore:
+                if asset["item_id"] in structure_item_id_list:
+                    return
+                asset.update({
+                    'type_name': SdeUtils.get_name_by_id(asset['type_id']),
+                    'owner_id': mission_obj.asset_owner_id
+                })
+                await NIU.merge_node(
+                    "Asset",
+                    {
+                        "item_id": asset["item_id"],
+                        "owner_id": asset["owner_id"],
+                    },
+                    asset
+                )
+
                 if asset["location_type"] == 'station':
-                    # 上级为空间站是NPC空间站，需要补充创建星系
-                    # 获取缓存
-                    station_info_cache = await redis_manager.redis.hgetall(f'eveesi:universe_stations_station:{asset["location_id"]}')
-                    if not station_info_cache:
-                        station_info = await eveesi.universe_stations_station(asset["location_id"])
-                        station_info_cache = {
-                            "name": station_info["name"],
-                            "system_id": station_info["system_id"],
-                        }
-                        await redis_manager.redis.hset(f'eveesi:universe_stations_station:{asset["location_id"]}', mapping=station_info_cache)
-                        await redis_manager.redis.expire(f'eveesi:universe_stations_station:{asset["location_id"]}', 60*60*24)
-                    else:
-                        station_info = station_info_cache
+                    await self.create_station_node(asset["location_id"])
 
-                    system_info = SdeUtils.get_system_info_by_id(station_info["system_id"])
-                    station_node = {
-                        'station_id': asset["location_id"],
-                        'station_name': station_info["name"],
-                        'system_id': station_info["system_id"],
-                        'system_name': system_info['system_name'],
-                    }
-                    asset.update({
-                        'owner_id': mission_obj.asset_owner_id,
-                        'type_name': SdeUtils.get_name_by_id(asset['type_id'])
-                    })
-                    await Neo4jAssetUtils.merge_asset_to_station(asset, station_node)
-                    # 连接station到system
+                await tqdm_manager.update_mission("_generate_all_nodes", 1)
+
+        await tqdm_manager.add_mission("_generate_all_nodes", len(assets_list))
+        tasks = [generate_with_semaphore(asset) for asset in assets_list]
+        await asyncio.gather(*tasks)
+        await tqdm_manager.complete_mission("_generate_all_nodes")
+
+    async def _generate_all_locate_relation(self, assets_list: list[dict], mission_obj: M_EveAssetPullMission):
+        async def generate_with_semaphore(asset: dict):
+            async with neo4j_manager.semaphore:
+                if asset["location_type"] == 'station':
+                    await NIU.link_node(
+                        "Asset",
+                        {
+                            "item_id": asset["item_id"],
+                            "type_id": asset["type_id"],
+                            "owner_id": asset["owner_id"],
+                        },
+                        {},
+                        "LOCATED_IN",
+                        {},{},
+                        "Station",
+                        {
+                            "station_id": asset["location_id"],
+                        },
+                        {}
+                    )
+                elif asset["location_type"] == 'solar_system':
+                    system_info = SdeUtils.get_system_info_by_id(asset["location_id"])
                     system_node = {
                         'system_id': system_info['system_id'],
                         'system_name': system_info['system_name'],
                         'region_id': system_info['region_id'],
                         'region_name': system_info['region_name'],
                     }
-                    await Neo4jAssetUtils.merge_station_to_system(station_node, system_node)
-                    assets_list_batch.remove(asset)
-
-                elif asset["location_flag"] in structure_sub_location_flags:
-                    # 这些location_flag的上级可能是玩家建筑，尝试连接已存在的建筑节点
-                    structure_node = {
-                        'structure_id': asset['location_id']
-                    }
-                    asset.update({
-                        'type_name': SdeUtils.get_name_by_id(asset['type_id']),
-                        'owner_id': mission_obj.asset_owner_id
-                    })
-                    if await Neo4jAssetUtils.merge_asset_to_structure_if_exists(asset, structure_node):
-                        assets_list_batch.remove(asset)
+                    async with CREATE_STATION_SEMAPHORE:
+                        await NIU.merge_node(
+                            "SolarSystem",
+                            {
+                                "solar_system_id": system_info["system_id"],
+                            },
+                            system_node
+                        )
+                    await NIU.link_node(
+                        "Asset",
+                        {
+                            "item_id": asset["item_id"],
+                            "type_id": asset["type_id"],
+                            "owner_id": asset["owner_id"],
+                        },
+                        {},
+                        "LOCATED_IN",
+                        {},{},
+                        "SolarSystem",
+                        {
+                            "solar_system_id": system_info["system_id"],
+                        },
+                        {}
+                    )
                 else:
-                    asset.update({
-                        'type_name': SdeUtils.get_name_by_id(asset['type_id']),
-                        'owner_id': mission_obj.asset_owner_id
-                    })
-            # 插入剩余所有未处理节点
-            assets_list_batch_withou_station_structure = [asset for asset in assets_list_batch if asset["location_type"] not in ['station', 'solar_system']]
-            await Neo4jAssetUtils.batch_create_assets(assets_list_batch_withou_station_structure)
+                    await NIU.link_node(
+                        "Asset",
+                        {
+                            "item_id": asset["item_id"],
+                            "type_id": asset["type_id"],
+                            "owner_id": asset["owner_id"],
+                        },
+                        {},
+                        "LOCATED_IN",
+                        {},{},
+                        "Asset",
+                        {
+                            "item_id": asset["location_id"],
+                            "owner_id": asset["owner_id"],
+                        },
+                        {}
+                    )
+                await tqdm_manager.update_mission("_generate_all_locate_relation", 1)
 
+        await tqdm_manager.add_mission("_generate_all_locate_relation", len(assets_list))
+        tasks = [generate_with_semaphore(asset) for asset in assets_list]
+        await asyncio.gather(*tasks)
+        await tqdm_manager.complete_mission("_generate_all_locate_relation")
+
+    async def _generate_forbidden_structure_node(self, mission_obj: M_EveAssetPullMission):
+        access_character = await CharacterManager().get_character_by_character_id(mission_obj.access_character_id)
         # 补全玩家建筑信息
-        forbidden_structure_node_list = await Neo4jAssetUtils.get_forbidden_structure_node_list(mission_obj.asset_owner_id)
+        forbidden_structure_node_list = await NAU.get_forbidden_structure_node_list(mission_obj.asset_owner_id)
 
+        await tqdm_manager.add_mission("_generate_forbidden_structure_node", len(forbidden_structure_node_list))
         for forbidden_structure_node in forbidden_structure_node_list:
             # 建筑信息
             structure_info_cache = await redis_manager.redis.hgetall(f'eveesi:universe_structures_structure:{forbidden_structure_node["item_id"]}')
@@ -203,7 +314,7 @@ class AssetManager(metaclass=SingletonMeta):
                         "type_id": structure_info["type_id"]
                     }
                 else:
-                    logger.info(f"建筑{forbidden_structure_node["item_id"]}无权限，创建无权限建筑")
+                    logger.debug(f"建筑{forbidden_structure_node["item_id"]}无权限，创建无权限建筑")
                     structure_info_cache = {
                         'name': f'Forbidden {SdeUtils.get_name_by_id(forbidden_structure_node['type_id'])}',
                         'owner_id': 'unknown',
@@ -246,8 +357,109 @@ class AssetManager(metaclass=SingletonMeta):
                 "type_name": structure_node['structure_type'],
                 "owner_id": mission_obj.asset_owner_id,
             })
-            await Neo4jAssetUtils.merge_asset_to_structure_to_solar_system(forbidden_structure_node, structure_node, solar_system_node)
+            async with CREATE_STATION_SEMAPHORE:
+                await NAU.merge_asset_to_structure_to_solar_system(forbidden_structure_node, structure_node, solar_system_node)
+            await tqdm_manager.update_mission("_generate_forbidden_structure_node", 1)
+        await tqdm_manager.complete_mission("_generate_forbidden_structure_node")
 
+    async def _update_structure_node(self, mission_obj: M_EveAssetPullMission):
+        access_character = await CharacterManager().get_character_by_character_id(mission_obj.access_character_id)
+        structure_asset_nodes = await NAU.get_structure_asset_nodes(mission_obj.asset_owner_id)
+        for node in structure_asset_nodes:
+            structure_info_cache = await redis_manager.redis.hgetall(f'eveesi:universe_structures_structure:{node["item_id"]}')
+            if not structure_info_cache:
+                structure_info = await eveesi.universe_structures_structure(access_character.ac_token, node["item_id"])
+                if structure_info:
+                    system_info = SdeUtils.get_system_info_by_id(structure_info["solar_system_id"])
+                    structure_info_cache = {
+                        "name": structure_info["name"],
+                        "owner_id": structure_info["owner_id"],
+                        "solar_system_id": structure_info["solar_system_id"],
+                        "type_id": structure_info["type_id"],
+                        "system_id": system_info['system_id'],
+                        "system_name": system_info['system_name'],
+                        "region_id": system_info['region_id'],
+                        "region_name": system_info['region_name'],
+                    }
+                else:
+                    logger.info(f"建筑{node["item_id"]}无权限，创建无权限建筑")
+                    structure_info_cache = {
+                        'name': f'Forbidden {SdeUtils.get_name_by_id(node['type_id'])}',
+                        'owner_id': 'unknown',
+                        'solar_system_id': 'unknown',
+                        'type_id': 'unknown',
+                        'system_id': 'unknown',
+                        'system_name': 'unknown',
+                        'region_id': 'unknown',
+                        'region_name': 'unknown',
+                    }
+                await redis_manager.redis.hset(f'eveesi:universe_structures_structure:{node["item_id"]}', mapping=structure_info_cache)
+                await redis_manager.redis.expire(f'eveesi:universe_structures_structure:{node["item_id"]}', 60*60*24)
+            structure_info = structure_info_cache
+            structure_node = {
+                'structure_id': node["item_id"],
+                'structure_name': structure_info["name"],
+                'structure_type': SdeUtils.get_name_by_id(structure_info['type_id']) if structure_info['type_id'] != 'unknown' else 'unknown',
+                'structure_type_id': structure_info['type_id'] if structure_info['type_id'] != 'unknown' else 'unknown',
+                'system_id': structure_info['system_id'],
+                'system_name': structure_info['system_name'],
+                'region_id': structure_info['region_id'],
+                'region_name': structure_info['region_name'],
+            }
+
+            await NAU.change_asset_to_structure(node, structure_node)
+            await tqdm_manager.update_mission("_update_structure_node", 1)
+        await tqdm_manager.complete_mission("_update_structure_node")
+
+    async def processing_asset_pull_mission(self, mission_obj: M_EveAssetPullMission):
+        if mission_obj.asset_owner_type == 'character':
+            pull_function = eveesi.characters_character_assets
+
+        elif mission_obj.asset_owner_type == 'corp':
+            pull_function = eveesi.corporations_corporation_assets
+
+        access_character = await CharacterManager().get_character_by_character_id(mission_obj.access_character_id)
+        assets = await pull_function(access_character.ac_token, mission_obj.asset_owner_id)
+        assets_list = []
+        for assets_list_batch in assets:
+            assets_list.extend(assets_list_batch)
+
+        # 生成所有节点
+        await self._generate_all_nodes(assets_list, mission_obj)
+        await self._generate_all_locate_relation(assets_list, mission_obj)
+        await self._generate_forbidden_structure_node(mission_obj)
+        await self._update_structure_node(mission_obj)
+        
     async def clean_asset_pull_mission_assets(self, mission_obj: M_EveAssetPullMission):
         owner_id = mission_obj.asset_owner_id
-        await Neo4jAssetUtils.delete_assets_by_owner_id(owner_id)
+        await NAU.delete_assets_by_owner_id(owner_id)
+
+    async def search_container_by_item_name(self, user_name, item_name: str):
+        type_id = SdeUtils.get_id_by_name(item_name)
+        # 获得用户能访问的所有资产所有者id
+        owner_id_list = []
+        async for mission in await EveAssetPullMissionDBUtils.select_all_by_user_name(user_name):
+            owner_id_list.append(mission.asset_owner_id)
+
+        # TODO 如果公司开放且不包含，则新增 
+
+        # 图搜索符合的节点，返回路径
+        paths = await NAU.search_container_by_item_name(owner_id_list, type_id)
+
+        if not paths:
+            raise KahunaException("找不到符合条件的容器")
+
+        output_list = []
+        for path in paths:
+            output = {}
+            for index, node in enumerate(path):
+                if index == 0:
+                    output['asset'] = node
+                if index == 1:
+                    output['container'] = node
+                if "Structure" in node['labels'] or 'Station' in node['labels']:
+                    output['structure'] = node
+                if "SolarSystem" in node['labels']:
+                    output['system'] = node
+            output_list.append(output)
+        return output_list

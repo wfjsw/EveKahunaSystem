@@ -170,3 +170,15 @@ async def pull_asset_now():
     except Exception as e:
         return jsonify({'code': 400, 'message': str(e)})
     return jsonify({'code': 200, 'message': '拉取成功'})
+
+@api_EVE_asset_bp.route('/searchContainerByItemNameAndQuantity', methods=['POST'])
+@auth_required
+async def search_container_by_item_name_and_quantity():
+    user_id = g.current_user["user_id"]
+    data = await request.json
+    item_name = data.get('item_name')
+    try:
+        output = await AssetManager().search_container_by_item_name(user_id, item_name)
+        return jsonify({'data': output, "status": 200})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400

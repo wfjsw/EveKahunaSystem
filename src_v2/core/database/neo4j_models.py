@@ -81,16 +81,11 @@ class Asset(NodeModel):
         需要在应用层通过 MERGE 语句确保唯一性
         """
         return [
+            {"property": "item_id", "type": "RANGE"},
             {"property": "type_id", "type": "RANGE"},
             {"property": "owner_id", "type": "RANGE"},
-            {"property": "location_type", "type": "RANGE"},
-            {"properties": ["owner_id", "item_id"], "type": "COMPOSITE"}  # 复合索引替代 NODE_KEY 约束
         ]
     
-    @classmethod
-    def get_constraints(cls) -> List[Dict[str, Any]]:
-        """获取约束定义（已废弃，使用索引替代）"""
-        return []
 
 @dataclass
 class SolarSystem(NodeModel):
@@ -110,11 +105,6 @@ class SolarSystem(NodeModel):
             {"property": "solar_system_id", "type": "RANGE"},
         ]
     
-    @classmethod
-    def get_constraints(cls) -> List[Dict[str, Any]]:
-        """获取约束定义（已废弃，使用索引替代）"""
-        return []
-
 @dataclass
 class Station(NodeModel):
     """空间站节点"""
@@ -130,11 +120,6 @@ class Station(NodeModel):
         return [
             {"property": "station_id", "type": "RANGE"},
         ]
-    
-    @classmethod
-    def get_constraints(cls) -> List[Dict[str, Any]]:
-        """获取约束定义（已废弃，使用索引替代）"""
-        return []
 
 @dataclass
 class Structure(NodeModel):
@@ -152,10 +137,22 @@ class Structure(NodeModel):
             {"property": "structure_id", "type": "RANGE"},
         ]
     
+@dataclass
+class AssetPermission(NodeModel):
+    """资产权限节点"""
+    user_name: str
+    plan_name: str
+
     @classmethod
-    def get_constraints(cls) -> List[Dict[str, Any]]:
-        """获取约束定义（已废弃，使用索引替代）"""
-        return []
+    def get_labels(cls) -> List[str]:
+        return ["AssetPermission"]
+    
+    @classmethod
+    def get_indexes(cls) -> List[Dict[str, Any]]:
+        return [
+            {"property": "user_name", "type": "RANGE"},
+            {"property": "plan_name", "type": "RANGE"},
+        ]
 
 # ==================== 工业制造相关节点模型 ====================
 

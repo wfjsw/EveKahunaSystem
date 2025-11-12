@@ -7,13 +7,38 @@ from typing import Tuple, List, Dict
 from math import ceil
 from src_v2.core.database.neo4j_models import MarketGroup
 from src_v2.core.database.neo4j_utils import Neo4jIndustryUtils as NIU
+from src_v2.core.database.neo4j_utils import Neo4jAssetUtils as NAU
 from src_v2.core.database.connect_manager import neo4j_manager, redis_manager, postgres_manager
-from src_v2.core.database.kahuna_database_utils_v2 import EveIndustryPlanDBUtils, EveIndustryPlanProductDBUtils
+from src_v2.core.database.kahuna_database_utils_v2 import (
+    EveIndustryPlanDBUtils,
+    EveIndustryPlanProductDBUtils,
+    EveIndustryAssetContainerPermissionDBUtils,
+    EveAssetPullMissionDBUtils,
+    EveIndustryPlanConfigFlowConfigDBUtils,
+    EveIndustryPlanConfigFlowDBUtils
+    )
+from src_v2.model.EVE.character import CharacterManager
 from src_v2.core.utils import KahunaException, SingletonMeta
 from src_v2.model.EVE.sde import SdeUtils
-from src_v2.model.EVE.sde.database import MarketGroups, InvTypes
+from src_v2.model.EVE.sde.database import (
+    MarketGroups,
+    InvTypes,
+    InvGroups,
+    InvCategories,
+    MetaGroups,
+    IndustryBlueprints
+)
+from src_v2.model.EVE.sde.database_cn import (
+    MarketGroups as MarketGroups_zh,
+    InvTypes as InvTypes_zh,
+    InvGroups as InvGroups_zh,
+    InvCategories as InvCategories_zh,
+    MetaGroups as MetaGroups_zh,
+    IndustryBlueprints as IndustryBlueprints_zh
+)
 from src_v2.core.log import logger
 from .blueprint import BPManager as BPM
+from src_v2.model.EVE.eveesi import eveesi
 
 from src_v2.core.utils import tqdm_manager
 
@@ -580,6 +605,210 @@ class IndustryManager(metaclass=SingletonMeta):
     @classmethod
     async def update_plan_status(cls, plan_name: str, user_name: str):
         await cls._relation_moniter_process(user_name, plan_name)
+
+    @classmethod
+    async def add_industrypermision(cls, user_id: str, data):
+        container_data = data['container']
+        asset_data = data['asset']
+        structure_data = data['structure']
+        system_data = data['system']
+
+        async for container in await EveIndustryAssetContainerPermissionDBUtils.select_all_by_user_name(user_id):
+            if container.asset_container_id == container_data['item_id']:
+                raise KahunaException(f"容器 {container_data['item_id']} 已存在")
+
+        permission_obj = EveIndustryAssetContainerPermissionDBUtils.get_obj()
+        permission_obj.user_name = user_id
+        permission_obj.asset_owner_id = asset_data['owner_id']
+        permission_obj.asset_container_id = container_data['item_id']
+        permission_obj.structure_id = structure_data['structure_id']
+        permission_obj.system_id = system_data['system_id']
+        permission_obj.tag = data['tag']
+        await EveIndustryAssetContainerPermissionDBUtils.save_obj(permission_obj)
+
+    @classmethod
+    async def delete_industrypermision(cls, user_id: str, data):
+        asset_owner_id = data['asset_owner_id']
+        asset_container_id = data['asset_container_id']
+
+        async for permission in await EveIndustryAssetContainerPermissionDBUtils.select_all_by_user_name(user_id):
+            if permission.asset_owner_id == asset_owner_id and permission.asset_container_id == asset_container_id:
+                await EveIndustryAssetContainerPermissionDBUtils.delete_obj(permission)
+                return
+        raise KahunaException(f"许可不存在")
+    
+    @classmethod
+    async def get_user_all_container_permission(cls, user_id: str):
+        all_container_permission = []
+        async for container in await EveIndustryAssetContainerPermissionDBUtils.select_all_by_user_name(user_id):
+            pull_mission = await EveAssetPullMissionDBUtils.select_mission_by_owner_id(container.asset_owner_id)
+            if not pull_mission:
+                continue
+            access_character = await CharacterManager().get_character_by_character_id(pull_mission.access_character_id)
+            owner_type = pull_mission.asset_owner_type
+            if owner_type == 'character':
+                owner = await eveesi.characters_character(pull_mission.asset_owner_id)
+                owner_name = owner['name']
+            elif owner_type == 'corp':
+                owner = await eveesi.corporations_corporation_id(pull_mission.asset_owner_id)
+                owner_name = owner['name']
+            system_info = SdeUtils.get_system_info_by_id(container.system_id)
+            structure_info_cache = await redis_manager.redis.hgetall(f'eveesi:universe_structures_structure:{container.structure_id}')
+            if not structure_info_cache:
+                structure_info_cache = await eveesi.universe_structures_structure(access_character.ac_token, container.structure_id)
+                structure_info_cache.pop("position")
+                await redis_manager.redis.hset(f'eveesi:universe_structures_structure:{container.structure_id}', mapping=structure_info_cache)
+            
+            container = {
+                "asset_owner_id": container.asset_owner_id,
+                "asset_container_id": container.asset_container_id,
+                "structure_id": container.structure_id,
+                "structure_name": structure_info_cache['name'],
+                "system_id": container.system_id,
+                "system_name": system_info['system_name'],
+                "owner_type": owner_type,
+                "owner_name": owner_name,
+                "tag": container.tag,
+            }
+            all_container_permission.append(container)
+
+
+        return all_container_permission
+
+    @classmethod
+    async def get_structure_list(cls):
+        structure_list = await NAU.get_structure_nodes()
+        res = [
+            {
+                "structure_id": structure["structure_id"],
+                "structure_name": structure["structure_name"],
+            } for structure in structure_list
+        ]
+        return res
+
+    @classmethod
+    async def get_structure_assign_keyword_suggestions(cls, assign_type: str):
+        output = []
+        SdeUtils
+        if assign_type == 'group':
+            output.extend([{"value": res.groupName, "label": res.groupName} for res in InvGroups.select(InvGroups.groupName)])
+            output.extend([{"value": res.groupName, "label": res.groupName} for res in InvGroups_zh.select(InvGroups_zh.groupName)])
+        elif assign_type == 'meta':
+            output.extend([{"value": res.nameID, "label": res.nameID} for res in MetaGroups.select(MetaGroups.nameID)])
+            output.extend([{"value": res.nameID, "label": res.nameID} for res in MetaGroups_zh.select(MetaGroups_zh.nameID)])
+        elif assign_type == 'blueprint':
+            query = (IndustryBlueprints
+                    .select(InvTypes.typeName)
+                    .join(InvTypes, on=(IndustryBlueprints.blueprintTypeID == InvTypes.typeID))
+                    .where(InvTypes.marketGroupID != None))
+            output.extend([{"value": res.invtypes.typeName, "label": res.invtypes.typeName} for res in query])
+            query_zh = (IndustryBlueprints_zh
+                       .select(InvTypes_zh.typeName)
+                       .join(InvTypes_zh, on=(IndustryBlueprints_zh.blueprintTypeID == InvTypes_zh.typeID))
+                       .where(InvTypes_zh.marketGroupID != None))
+            output.extend([{"value": res.invtypes.typeName, "label": res.invtypes.typeName} for res in query_zh])
+        elif assign_type == 'marketGroup':
+            output.extend([{"value": res.nameID, "label": res.nameID} for res in MarketGroups.select(MarketGroups.nameID)])
+            output.extend([{"value": res.nameID, "label": res.nameID} for res in MarketGroups_zh.select(MarketGroups_zh.nameID)])
+        elif assign_type == 'category':
+            output.extend([{"value": res.categoryName, "label": res.categoryName} for res in InvCategories.select(InvCategories.categoryName)])
+            output.extend([{"value": res.categoryName, "label": res.categoryName} for res in InvCategories_zh.select(InvCategories_zh.categoryName)])
+
+        return output
+
+    @classmethod
+    async def get_type_list(cls):
+        output = []
+        output.extend([{"value": res.typeName, "label": res.typeName} for res in InvTypes.select(InvTypes.typeName)])
+        output.extend([{"value": res.typeName, "label": res.typeName} for res in InvTypes_zh.select(InvTypes_zh.typeName)])
+        return output
+
+    @classmethod
+    async def create_config_flow_config(cls, user_id: str, data):
+        config_obj = EveIndustryPlanConfigFlowConfigDBUtils.get_obj()
+        config_obj.user_name = user_id
+        config_obj.config_type = data['config_type']
+        config_obj.config_value = data['config_value']
+        await EveIndustryPlanConfigFlowConfigDBUtils.save_obj(config_obj)
+
+    @classmethod
+    async def get_config_flow_config_list(cls, user_id: str):
+        res_list = []
+        async for config in await EveIndustryPlanConfigFlowConfigDBUtils.select_all_by_user_name(user_id):
+            res_list.append({
+                "config_id": config.id,
+                "config_type": config.config_type,
+                "config_value": config.config_value
+            })
+        return res_list
+
+    @classmethod
+    async def add_config_to_plan(cls, user_id: str, data):
+        plan_name = data['plan_name']
+        config_id = data['config_id']
+        config = await EveIndustryPlanConfigFlowConfigDBUtils.select_by_id(config_id)
+        if not config:
+            raise KahunaException(f"配置不存在")
+        plan_config_obj = await EveIndustryPlanConfigFlowDBUtils.select_configflow_by_user_name_and_plan_name(user_id, plan_name)
+        if not plan_config_obj:
+            plan_config_obj = EveIndustryPlanConfigFlowDBUtils.get_obj()
+            plan_config_obj.user_name = user_id
+            plan_config_obj.plan_name = plan_name
+            plan_config_obj.config_list = [config_id]
+            await EveIndustryPlanConfigFlowDBUtils.save_obj(plan_config_obj)
+        else:
+            if config_id in plan_config_obj.config_list:
+                raise KahunaException(f"配置已存在")
+            plan_config_obj.config_list.append(config_id)
+            await EveIndustryPlanConfigFlowDBUtils.merge(plan_config_obj)
+
+    @classmethod
+    async def get_config_flow_list(cls, user_id: str, plan_name: str):
+        plan_config_flow_obj = await EveIndustryPlanConfigFlowDBUtils.select_configflow_by_user_name_and_plan_name(user_id, plan_name)
+        if not plan_config_flow_obj:
+            return []
+
+        config_id_list = plan_config_flow_obj.config_list
+        config_list = []
+        for config_id in config_id_list:
+            config = await EveIndustryPlanConfigFlowConfigDBUtils.select_by_id(config_id)
+            if not config:
+                raise KahunaException(f"配置{config_id}不存在")
+            config_list.append({
+                "config_id": config.id,
+                "config_type": config.config_type,
+                "config_value": config.config_value
+            })
+            if config.config_type == 'StructureRigConfig':
+                structure_info = await NIU.get_structure_node_by_id(config.config_value['structure_id'])
+                config_list[-1]['config_value']['structure_name'] = structure_info.get('structure_name', None)
+            logger.info(type(config.config_value))
+            logger.info(config.config_value)
+        return config_list
+
+    @classmethod
+    async def delete_config_from_plan(cls, user_id: str, data):
+        plan_name = data['plan_name']
+        config_id = data['config_id']
+        plan_config_flow_obj = await EveIndustryPlanConfigFlowDBUtils.select_configflow_by_user_name_and_plan_name(user_id, plan_name)
+        if not plan_config_flow_obj:
+            raise KahunaException(f"配置不存在")
+        plan_config_flow_obj.config_list.remove(config_id)
+        await EveIndustryPlanConfigFlowDBUtils.merge(plan_config_flow_obj)
+
+    @classmethod
+    async def save_config_flow_to_plan(cls, user_id: str, plan_name: str, data):
+        config_id_list = [d["config_id"] for d in data["config_list"]]
+        config_flow_obj = await EveIndustryPlanConfigFlowDBUtils.select_configflow_by_user_name_and_plan_name(user_id, plan_name)
+        if not config_flow_obj:
+            config_flow_obj = EveIndustryPlanConfigFlowDBUtils.get_obj()
+            config_flow_obj.user_name = user_id
+            config_flow_obj.plan_name = plan_name
+            config_flow_obj.config_list = config_id_list
+            await EveIndustryPlanConfigFlowDBUtils.save_obj(config_flow_obj)
+        else:
+            config_flow_obj.config_list = config_id_list
+            await EveIndustryPlanConfigFlowDBUtils.merge(config_flow_obj)
 
 class MarketTree():
     def __init__(self):

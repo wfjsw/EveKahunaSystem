@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { http } from '@/http'
 import { VueDraggable } from 'vue-draggable-plus'
 import IndustryPlanPlanTable from './components/industryPlanPlanTable.vue'
+import IndustryPlanConfigFlow from './components/industryPlanConfigFlow.vue'
 
 interface PlanProductTableData {
   "row_id": number,
@@ -236,8 +237,9 @@ onMounted(() => {
             </el-table>
         </el-scrollbar>
         </div>
+
         <div class="industry-plan-table-container" style="display: flex; flex-direction: horizontal; justify-content: flex-start;">
-          <div class="industry-plan-table-product-list">
+          <div class="industry-plan-table-product-list" style="min-width: 350px;">
             <div style="padding: 10px;">
               <span>当前计划: </span>
               <el-select
@@ -266,8 +268,8 @@ onMounted(() => {
               <industry-plan-plan-table :list="currentPlanProducts" />
             </VueDraggable>
           </div>
-          <div class="industry-plan-table-fonfig-flow">
-            配置流
+          <div class="industry-plan-table-fonfig-flow" style="min-width: 350px;">
+            <industry-plan-config-flow :selected-plan="selectedPlan" />
           </div>
         </div>
       </div>
@@ -375,5 +377,11 @@ onMounted(() => {
 }
 .industry-plan-tabs {
   height: 86vh;
+}
+.industry-plan-table-fonfig-flow {
+  width: 60%;
+  background-color: #f5f7fa;
+  padding: 10px;
+  border-radius: 10px;
 }
 </style>

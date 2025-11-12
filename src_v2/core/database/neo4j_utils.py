@@ -301,7 +301,84 @@ class Neo4jAssetUtils:
             DETACH DELETE a
             """
             await tx.run(query, {"owner_id": owner_id})
-            
+    
+    @staticmethod
+    async def search_container_by_item_name(owner_ids: List[int], type_id: int):
+        async with neo4j_manager.get_session() as session:
+            query = """
+            match path = (a:Asset)-[r:LOCATED_IN*0..20]->(b:SolarSystem)
+            where a.owner_id IN $owner_ids and a.type_id = $type_id
+            return a, nodes(path) as path_nodes, b
+            """
+            result = await session.run(query, {"owner_ids": owner_ids, "type_id": type_id})
+            result_list = []
+            async for record in result:
+                if record and record["path_nodes"]:
+                    # 将路径节点列表转换为字典列表
+                    path_nodes = []
+                    for node in record["path_nodes"]:
+                        node_dict = dict(node)
+                        node_dict['labels'] = list(node.labels)
+                        path_nodes.append(node_dict)
+                    result_list.append(path_nodes)
+            return result_list
+
+    @staticmethod
+    async def get_structure_asset_nodes(owner_id: int) -> List[Dict]:
+        query = """
+        match (a:Asset {owner_id: $owner_id})-[]->(b:SolarSystem) return a,b
+        """
+        async with neo4j_manager.get_session() as session:
+            result = await session.run(query, {"owner_id": owner_id})
+            nodes = []
+            async for record in result:
+                nodes.append(dict(record["a"]))
+            return nodes
+
+    @staticmethod
+    async def change_asset_to_structure(asset_dict: Dict, structure_dict: Dict):
+        query = """
+        match (a:Asset {item_id: $item_id,owner_id: $owner_id})
+        REMOVE a:Asset
+        SET a:Structure
+        SET a.structure_id = $structure_id,
+            a.structure_name = $structure_name,
+            a.structure_type = $structure_type,
+            a.system_id = $system_id,
+            a.system_name = $system_name,
+            a.region_id = $region_id,
+            a.region_name = $region_name
+        return a
+        """
+        async with neo4j_manager.get_transaction() as tx:
+            result = await tx.run(
+                query,
+                {
+                    "item_id": asset_dict.get("item_id"),
+                    "owner_id": asset_dict.get("owner_id"),
+                    "structure_id": structure_dict.get("structure_id"),
+                    "structure_name": structure_dict.get("structure_name"),
+                    "structure_type": structure_dict.get("structure_type"),
+                    "system_id": structure_dict.get("system_id"),
+                    "system_name": structure_dict.get("system_name"),
+                    "region_id": structure_dict.get("region_id"),
+                    "region_name": structure_dict.get("region_name")
+                })
+            record = await result.single()
+            return record is not None
+
+    @staticmethod
+    async def get_structure_nodes() -> List[Dict]:
+        query = """
+        match (a:Structure) return a
+        """
+        async with neo4j_manager.get_session() as session:
+            result = await session.run(query)
+            nodes = []
+            async for record in result:
+                nodes.append(dict(record["a"]))
+            return nodes
+
 class Neo4jIndustryUtils:
     """工业制造相关的 CRUD 操作"""
     @staticmethod
@@ -1238,3 +1315,12 @@ class Neo4jIndustryUtils:
             record = await result.single()
             deleted_count = record["deleted_count"] if record else 0
             return deleted_count
+
+    @staticmethod
+    async def get_structure_node_by_id(structure_id: int) -> Dict[str, Any]:
+        """获取结构节点"""
+        async with neo4j_manager.get_session() as session:
+            query = "MATCH (n:Structure {structure_id: $structure_id}) RETURN n"
+            result = await session.run(query, {"structure_id": structure_id})
+            record = await result.single()
+            return dict(record["n"])

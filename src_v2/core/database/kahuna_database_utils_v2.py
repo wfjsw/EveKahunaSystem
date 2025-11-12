@@ -170,7 +170,11 @@ class _CommonUtils:
         if not cls.cls_model:
             raise Exception("cls_model is None")
         async with dbm.get_session() as session:
-            await session.delete(obj)
+            # 将对象合并到当前会话
+            merged_obj = await session.merge(obj)
+            await session.delete(merged_obj)
+            await session.commit()
+
 
 class _CommonCacheUtils:
     cls_model = None
@@ -563,6 +567,13 @@ class EveAssetPullMissionDBUtils(_CommonUtils):
             return result.scalars().first()
 
     @classmethod
+    async def select_mission_by_owner_id(cls, asset_owner_id: int):
+        async with dbm.get_session() as session:
+            stmt = select(cls.cls_model).where(cls.cls_model.asset_owner_id == asset_owner_id)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
+    @classmethod
     async def select_all_by_owner_id_and_owner_type(cls, asset_owner_id: int, asset_owner_type: str):
         stmt = select(cls.cls_model).where(cls.cls_model.asset_owner_id == asset_owner_id).where(cls.cls_model.asset_owner_type == asset_owner_type)
         return await _AsyncIteratorWrapper.from_stmt(stmt)
@@ -609,3 +620,36 @@ class EveIndustryPlanProductDBUtils(_CommonUtils):
         else:
             stmt = delete(cls.cls_model).where(cls.cls_model.user_name == user_name).where(cls.cls_model.plan_name == plan_name)
             await session.execute(stmt)
+
+class EveIndustryAssetContainerPermissionDBUtils(_CommonUtils):
+    cls_model = model.EveIndustryAssetContainerPermission
+
+    @classmethod
+    async def select_all_by_user_name(cls, user_name: str):
+        stmt = select(cls.cls_model).where(cls.cls_model.user_name == user_name).order_by(cls.cls_model.id)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+class EveIndustryPlanConfigFlowConfigDBUtils(_CommonUtils):
+    cls_model = model.EveIndustryPlanConfigFlowConfig
+
+    @classmethod
+    async def select_all_by_user_name(cls, user_name: str):
+        stmt = select(cls.cls_model).where(cls.cls_model.user_name == user_name).order_by(cls.cls_model.id)
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+    @classmethod
+    async def select_by_id(cls, id: int):
+        async with dbm.get_session() as session:
+            stmt = select(cls.cls_model).where(cls.cls_model.id == id)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
+class EveIndustryPlanConfigFlowDBUtils(_CommonUtils):
+    cls_model = model.EveIndustryPlanConfigFlow
+
+    @classmethod
+    async def select_configflow_by_user_name_and_plan_name(cls, user_name: str, plan_name: str):
+        async with dbm.get_session() as session:
+            stmt = select(cls.cls_model).where(cls.cls_model.user_name == user_name).where(cls.cls_model.plan_name == plan_name)
+            result = await session.execute(stmt)
+            return result.scalars().first()

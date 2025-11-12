@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { Setting, SuccessFilled, CircleCloseFilled, Plus, CloseBold, Delete, Refresh, VideoPlay } from '@element-plus/icons-vue'
 import { http } from '@/http'
 import { ElMessage } from 'element-plus';
+import AssetViewIndustrypermision from './components/AssetViewIndustrypermision.vue'
 
 const form = ref({
   allow_personal_asset: false,
@@ -315,8 +316,11 @@ onUnmounted(() => {
 
 <template>
 <el-tabs>
-  <el-tab-pane label="个人资产">
+  <el-tab-pane label="资产浏览">
 
+  </el-tab-pane>
+  <el-tab-pane label="工业访问许可">
+    <AssetViewIndustrypermision />
   </el-tab-pane>
   <el-tab-pane label="资产拉取状态">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">

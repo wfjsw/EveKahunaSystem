@@ -98,4 +98,147 @@ async def get_plan_calculate_result_table_view():
         return jsonify({"error": str(e)}), 500
     except Exception as e:
         logger.error(f"获取计划计算结果表格视图失败: {traceback.format_exc()}")
-        return jsonify({"error": "获取计划计算结果表格视图失败"}), 500
+        return jsonify({"message": "获取计划计算结果表格视图失败"}), 500
+
+@api_industry_bp.route("/addIndustrypermision", methods=["POST"])
+@auth_required
+async def add_industrypermision():
+    data = await request.json
+    user_id = g.current_user["user_id"]
+
+    try:
+        await IndustryManager.add_industrypermision(user_id,data)
+        return jsonify({"message": "新增许可成功", "status": 200})
+    except:
+        logger.error(f"新增许可失败: {traceback.format_exc()}")
+        return jsonify({"message": "新增许可失败", "status": 500}), 500
+
+@api_industry_bp.route("/getUserAllContainerPermission", methods=["GET"])
+@auth_required
+async def get_user_all_container_permission():
+    user_id = g.current_user["user_id"]
+
+    try:
+        all_container_permission = await IndustryManager.get_user_all_container_permission(user_id)
+        return jsonify({"data": all_container_permission, "status": 200})
+    except:
+        logger.error(f"获取用户所有容器许可失败: {traceback.format_exc()}")
+        return jsonify({"message": "获取用户所有容器许可失败", "status": 500}), 500
+
+@api_industry_bp.route("/deleteIndustrypermision", methods=["POST"])
+@auth_required
+async def delete_industrypermision():
+    data = await request.json
+    user_id = g.current_user["user_id"]
+
+    try:
+        await IndustryManager.delete_industrypermision(user_id, data)
+        return jsonify({"message": "删除许可成功", "status": 200})
+    except:
+        logger.error(f"删除许可失败: {traceback.format_exc()}")
+        return jsonify({"message": "删除许可失败", "status": 500}), 500
+
+@api_industry_bp.route("/getStructureList", methods=["GET"])
+@auth_required
+async def get_structure_list():
+    try:
+        structure_list = await IndustryManager.get_structure_list()
+        return jsonify({"data": structure_list, "status": 200})
+    except:
+        logger.error(f"获取建筑列表失败: {traceback.format_exc()}")
+        return jsonify({"message": "获取建筑列表失败", "status": 500}), 500
+        
+@api_industry_bp.route("/getStructureAssignKeywordSuggestions", methods=["POST"])
+@auth_required
+async def get_structure_assign_keyword_suggestions():
+    data = await request.json
+    user_id = g.current_user["user_id"]
+
+    try:
+        assign_keyword_suggestions = await IndustryManager.get_structure_assign_keyword_suggestions(data["assign_type"])
+        return jsonify({"data": assign_keyword_suggestions, "status": 200})
+    except:
+        logger.error(f"获取建筑分配关键字建议失败: {traceback.format_exc()}")
+        return jsonify({"message": "获取建筑分配关键字建议失败", "status": 500}), 500
+
+@api_industry_bp.route("/getTypeList", methods=["GET"])
+@auth_required
+async def get_type_list():
+    data = await request.json
+    user_id = g.current_user["user_id"]
+
+    try:
+        type_list = await IndustryManager.get_type_list()
+        return jsonify({"data": type_list, "status": 200})
+    except:
+        logger.error(f"获取类型列表失败: {traceback.format_exc()}")
+        return jsonify({"error": "获取类型列表失败", "status": 500}), 500
+
+@api_industry_bp.route("/createConfigFlowConfig", methods=["POST"])
+@auth_required
+async def create_config_flow_config():
+    data = await request.json
+    user_id = g.current_user["user_id"]
+    
+    logger.info(f"创建配置流配置: {data}")
+    try:
+        await IndustryManager.create_config_flow_config(user_id, data)
+        return jsonify({"message": "创建配置流配置成功", "status": 200})
+    except:
+        logger.error(f"创建配置流配置失败: {traceback.format_exc()}")
+        return jsonify({"message": "创建配置流配置失败", "status": 500}), 500
+
+@api_industry_bp.route("/getConfigFlowConfigList", methods=["GET"])
+@auth_required
+async def get_config_flow_config_list():
+    data = await request.json
+    user_id = g.current_user["user_id"]
+
+    try:
+        config_flow_config_list = await IndustryManager.get_config_flow_config_list(user_id)
+        return jsonify({"data": config_flow_config_list, "status": 200})
+    except:
+        logger.error(f"获取配置流配置列表失败: {traceback.format_exc()}")
+        return jsonify({"message": "获取配置流配置列表失败", "status": 500}), 500
+
+# 添加配置到计划
+@api_industry_bp.route("/addConfigToPlan", methods=["POST"])
+@auth_required
+async def add_config_to_plan():
+    data = await request.json
+    user_id = g.current_user["user_id"]
+
+    try:
+        await IndustryManager.add_config_to_plan(user_id, data)
+        return jsonify({"message": "添加配置到计划成功", "status": 200})
+    except:
+        logger.error(f"添加配置到计划失败: {traceback.format_exc()}")
+        return jsonify({"message": "添加配置到计划失败", "status": 500}), 500
+
+# 获取计划配置流列表
+@api_industry_bp.route("/getConfigFlowList", methods=["POST"])
+@auth_required
+async def get_config_flow_list():
+    data = await request.json
+    user_id = g.current_user["user_id"]
+
+    try:
+        config_flow_list = await IndustryManager.get_config_flow_list(user_id, data["plan_name"])
+        return jsonify({"data": config_flow_list, "status": 200})
+    except:
+        logger.error(f"获取配置流列表失败: {traceback.format_exc()}")
+        return jsonify({"message": "获取配置流列表失败", "status": 500}), 500
+
+# 保存计划配置流
+@api_industry_bp.route("/saveConfigFlowToPlan", methods=["POST"])
+@auth_required
+async def save_config_flow_to_plan():
+    data = await request.json
+    user_id = g.current_user["user_id"]
+
+    try:
+        await IndustryManager.save_config_flow_to_plan(user_id, data["plan_name"], data)
+        return jsonify({"message": "保存配置流成功", "status": 200})
+    except:
+        logger.error(f"保存配置流失败: {traceback.format_exc()}")
+        return jsonify({"message": "保存配置流失败", "status": 500}), 500

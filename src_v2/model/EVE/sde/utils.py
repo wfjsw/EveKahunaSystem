@@ -165,7 +165,11 @@ class SdeUtils:
     def get_name_by_id(type_id) -> str:
         try:
             return InvTypes.get(InvTypes.typeID == type_id).typeName
-        except DoesNotExist:
+        except InvTypes.DoesNotExist:
+            return None
+        except Exception as e:
+            # 捕获其他可能的异常，避免程序崩溃
+            logger.warning(f"获取 type_id={type_id} 的名称时出错: {e}")
             return None
 
     @staticmethod

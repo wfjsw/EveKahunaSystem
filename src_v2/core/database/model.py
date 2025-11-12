@@ -139,6 +139,7 @@ class EveCorporation(PostgreModel):
     corporation_icon = Column(Text)
 all_model.append(EveCorporation)
 
+# 资产拉取任务
 class EveAssetPullMission(PostgreModel):
     __tablename__ = 'eve_asset_pull_mission'
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -150,13 +151,19 @@ class EveAssetPullMission(PostgreModel):
     last_pull_time = Column(DateTime)
 all_model.append(EveAssetPullMission)
 
-class EveAssetNodeAccess(PostgreModel):
-    __tablename__ = 'eve_asset_node_access'
+# 工业资产容器权限
+class EveIndustryAssetContainerPermission(PostgreModel):
+    __tablename__ = 'eve_industry_asset_container_permission'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    asset_owner_type = Column(Text)
-    asset_owner_id = Column(Integer)
-all_model.append(EveAssetNodeAccess)
+    user_name = Column(Text, index=True)
+    asset_owner_id = Column(BigInteger)
+    asset_container_id = Column(BigInteger, index=True)
+    structure_id = Column(BigInteger)
+    system_id = Column(Integer)
+    tag = Column(Text)
+all_model.append(EveIndustryAssetContainerPermission)
 
+# 工业计划
 class EveIndustryPlan(PostgreModel):
     __tablename__ = 'eve_industry_plan'
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -175,13 +182,31 @@ class EveIndustryPlanProduct(PostgreModel):
     quantity = Column(Integer)
 all_model.append(EveIndustryPlanProduct)
 
+# 工业计划配置流 配置库
+class EveIndustryPlanConfigFlowConfig(PostgreModel):
+    __tablename__ = 'eve_industry_plan_config_flow_config'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_name = Column(Text, index=True)
+    config_type = Column(Text)
+    config_value = Column(JSONB)
+all_model.append(EveIndustryPlanConfigFlowConfig)
+
 class EveIndustryPlanConfigFlow(PostgreModel):
     __tablename__ = 'eve_industry_plan_config_flow'
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_name = Column(Text, index=True)
     plan_name = Column(Text, index=True)
-    
+    config_list = Column(ARRAY(Integer))
 all_model.append(EveIndustryPlanConfigFlow)
+
+class EveIndustryPlanConfigFlowPresupposition(PostgreModel):
+    __tablename__ = 'eve_industry_plan_config_flow_presupposition'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_name = Column(Text, index=True)
+    presupposition_name = Column(Text)
+    config_list = Column(ARRAY(Integer))
+all_model.append(EveIndustryPlanConfigFlowPresupposition)
+
 
 # class EveIndustryPlanSetting(PostgreModel):
 #     __tablename__ = 'eve_industry_plan_setting'

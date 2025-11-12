@@ -181,6 +181,13 @@ class PostgreDatabaseManager():
         
         for col in autoincrement_pk_cols:
             col_name = col.name
+            # 检查列类型，只有整数类型才需要序列
+            from sqlalchemy import Integer, BigInteger, SmallInteger
+            if not isinstance(col.type, (Integer, BigInteger, SmallInteger)):
+                # 跳过非整数类型的主键（如 Text 类型的主键）
+                logger.debug(f"跳过非整数类型的主键列 {table_name}.{col_name} (类型: {col.type})")
+                continue
+                
             sequence_name = f"{table_name}_{col_name}_seq"
             
             # 使用保存点来隔离序列修复操作，避免影响主事务
@@ -548,7 +555,7 @@ class RedisDatabaseManager():
         )
 
         # 删除forever:开头的key之外的数据
-        # await self._redis.flushall()
+        await self._redis.flushall()
         
         logger.info(f"Redis 连接成功: {host}:{port}")
 
