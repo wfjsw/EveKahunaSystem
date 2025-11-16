@@ -3,7 +3,6 @@ from asyncio import Queue
 from enum import Flag
 from itertools import product
 import json
-from nt import system
 from typing import Tuple, List, Dict
 from math import ceil
 from src_v2.core.database.neo4j_models import MarketGroup
