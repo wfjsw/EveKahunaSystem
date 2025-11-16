@@ -13,10 +13,15 @@ from src_v2.core.log import logger
 LOCAL_HTTP_ADD = config.get("EVE", "CALLBACK_LOCAL_ADD", fallback=None)
 CALL_BACK_API = "/api/EVE/oauth/callback"
 
-PROXY = {
-    "http": "http://127.0.0.1:7890",
-    "https": "http://127.0.0.1:7890"
-}
+PROXY_ADD = config.get("APP", "PROXY", fallback=None)
+PROXY_PORT = config.get("APP", "PORT", fallback=None)
+if PROXY_ADD and PROXY_PORT:
+    PROXY = {
+        "http": f"http://{PROXY_ADD}:{PROXY_PORT}",
+        "https": f"http://{PROXY_ADD}:{PROXY_PORT}"
+    }
+else:
+    PROXY = None
 
 callback_url = LOCAL_HTTP_ADD + CALL_BACK_API
 
