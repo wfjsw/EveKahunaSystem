@@ -3,6 +3,7 @@ from asyncio import Queue
 from enum import Flag
 from itertools import product
 import json
+from nt import system
 from typing import Tuple, List, Dict
 from math import ceil
 from src_v2.core.database.neo4j_models import MarketGroup
@@ -333,6 +334,12 @@ class IndustryManager(metaclass=SingletonMeta):
                 "quantity": node_dict[material_id].get('quantity', 0) + relation['quantity'],
                 "real_quantity": node_dict[material_id].get('real_quantity', 0) + relation['real_quantity'],
             })
+
+            # 汇总产品节点的eiv成本
+            if product_id in node_dict:
+                node_dict[product_id].update({
+                    "eiv_cost": node_dict[product_id].get('eiv_cost', 0) + relation['eiv_cost'],
+                })
             
             # 汇总产品节点计算后真实任务数据【job】
             # 处理product任务 每个 (product_id, index_id) 只处理一次
@@ -384,6 +391,7 @@ class IndustryManager(metaclass=SingletonMeta):
         work_flow = []
         await tqdm_manager.add_mission(f"分类节点 {plan_name}", len(node_dict))
         for node in node_dict.values():
+            # 整理库存状态
             node['tpye_name_zh'] = SdeUtils.get_cn_name_by_id(node['type_id'])
             if op.get_node_type(node['type_id']) != "product":
                 material_type_node = await cls._get_material_type(node)
@@ -409,6 +417,10 @@ class IndustryManager(metaclass=SingletonMeta):
                 } for work in node.get("real_job_list", []) if work
             ])
 
+            # 整理蓝图库存
+            node['bp_quantity'], node['bp_jobs'] = await op.get_bp_status(node['type_id'])
+            logger.info(f"蓝图库存: {node['type_id']} {node['bp_quantity']} {node['bp_jobs']}")
+        
 
         # TODO 获取材料报价
         await rdm.r.hset(op.current_progress_key, mapping={"name": "获取材料报价", "progress": 50, "is_indeterminate": 1})
@@ -631,6 +643,7 @@ class IndustryManager(metaclass=SingletonMeta):
                     "real_product_remain": 0,
                     "real_work_remain": 0,
                     "status": "complete",
+                    "eiv_cost": 0,
                     "need_calculate": False
                 }
             )
@@ -792,7 +805,14 @@ class IndustryManager(metaclass=SingletonMeta):
         real_quantity_material_need = sum(real_quantity_material_need_list)
         real_quantity_time_need = sum(real_quantity_time_need_list)
 
-        # TODO 系数成本计算 ==============================================================================================
+        # 系数成本计算 ==============================================================================================
+        structure_info = await op.get_type_assign_structure_info(product_type_id)
+        if not structure_info:
+            raise KahunaException(f"物品 {product_type_id} 未分配建筑")
+        material_adjust_price = await op.get_type_adjust_price(material_type_id)
+        system_cost = await op.get_system_cost(structure_info['system_id'])
+        actype = "manufacturing" if self_relation['activity_id'] == 1 else "reaction"
+        eiv_cost = float(system_cost[actype]) * material_adjust_price * self_relation['material_num']
 
         # 更新状态
         res = await NIU.update_relation_properties(
@@ -813,6 +833,7 @@ class IndustryManager(metaclass=SingletonMeta):
                 "real_product_remain": self_real_product_remain,
                 "real_work_remain": real_all_index_remain_work,
                 "status": "complete",
+                "eiv_cost": eiv_cost,
                 "need_calculate": True
             }
         )

@@ -725,9 +725,20 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
                     <el-table-column label="缺失流程" prop="real_jobs" :formatter="(row: any, column: any, cellValue: any) => formatAccounting(cellValue)"/>
                     <el-table-column label="总流程" prop="jobs" :formatter="(row: any, column: any, cellValue: any) => formatAccounting(cellValue)"/>
                     <el-table-column label="蓝图库存单位" prop="bp_quantity" :formatter="(row: any, column: any, cellValue: any) => formatAccounting(cellValue)"/>
-                    <el-table-column label="蓝图库存流程" prop="bp_jobs" :formatter="(row: any, column: any, cellValue: any) => formatAccounting(cellValue)"/>
+                    <el-table-column label="蓝图库存流程" prop="bp_jobs">
+                        <template #default="{ row }">
+                            <template v-if="row?.bp_jobs">
+                                <span v-if="Number(row?.bp_jobs?.bpc) > 0">
+                                    {{ Number(row?.bp_jobs?.bpc) }} 流程拷贝
+                                </span>
+                                <span v-if="Number(row?.bp_jobs?.bpc) > 0 && Number(row?.bp_jobs?.bpo) > 0">，</span>
+                                <span v-if="Number(row?.bp_jobs?.bpo) > 0">
+                                    {{ Number(row?.bp_jobs?.bpo) }} 份原图
+                                </span>
+                            </template>
+                        </template>
+                    </el-table-column>
                     <el-table-column label="状态" prop="status" />
-
                 </el-table>
             </el-tab-pane>
             <el-tab-pane label="材料视图">

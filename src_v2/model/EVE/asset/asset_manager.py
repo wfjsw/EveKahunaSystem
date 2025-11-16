@@ -255,6 +255,8 @@ class AssetManager(metaclass=SingletonMeta):
                         {}
                     )
                 elif asset["location_type"] == 'solar_system':
+                    if asset["item_id"] in structure_item_id_list:
+                        return
                     system_info = SdeUtils.get_system_info_by_id(asset["location_id"])
                     system_node = {
                         'system_id': system_info['system_id'],
@@ -290,7 +292,6 @@ class AssetManager(metaclass=SingletonMeta):
                     )
                 else:
                     if asset["location_id"] in structure_item_id_list:
-                        
                         await NIU.link_node(
                             "Asset",
                             {
@@ -462,6 +463,8 @@ class AssetManager(metaclass=SingletonMeta):
                 await rdm.redis.hset(f'eveesi:universe_structures_structure:{node["item_id"]}', mapping=structure_info_cache)
                 await rdm.redis.expire(f'eveesi:universe_structures_structure:{node["item_id"]}', 60*60*24)
             structure_info = structure_info_cache
+            if "system_id" not in structure_info:
+                logger.error(f"建筑{node["item_id"]}无星系信息，跳过更新")
             structure_node = {
                 'structure_id': node["item_id"],
                 'structure_name': structure_info["name"],

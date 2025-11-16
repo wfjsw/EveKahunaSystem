@@ -552,7 +552,7 @@ class RedisDatabaseManager():
         )
 
         # 删除forever:开头的key之外的数据
-        await self._redis.flushall()
+        # await self._redis.flushall()
         
         logger.info(f"Redis 连接成功: {host}:{port}")
 

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from math import ceil
 from src_v2.core.database.kahuna_database_utils_v2 import (
     EveAssetPullMissionDBUtils,
@@ -24,6 +25,8 @@ running_job_update_lock = asyncio.Lock()
 bp_asset_prepare_lock = asyncio.Lock()
 asset_prepare_lock = asyncio.Lock()
 running_asset_prepare_lock = asyncio.Lock()
+refresh_system_cost_lock = asyncio.Lock()
+refresh_market_price_lock = asyncio.Lock()
 
 from src_v2.core.log import logger
 
@@ -106,6 +109,16 @@ class ConfigFlowOperateCenter():
         self.node_need_quantity = {}
 
         self.set_uped_jobs = {}
+
+        self._system_cost_status = False
+        self._system_cost = {}
+
+        self.type_eff_cache = {}
+
+        self.type_assign_structure_info_cache = {}
+
+        self._market_price_status = False
+        self._type_adjust_price = {}
 
     @classmethod
     async def create(cls, user_name: str, plan_name: str):
@@ -309,7 +322,7 @@ class ConfigFlowOperateCenter():
                 if not assets_json:
                     character = await CharacterManager().get_character_by_character_id(character_id)
                     assets = await eveesi.characters_character_id_blueprints(character.ac_token, character_id)
-                    await rds.r.set(f"bp_assets_cha_{character_id}", json.dumps(assets), ex=15)
+                    await rds.r.set(f"bp_assets_cha_{character_id}", json.dumps(assets), ex=15 * 60)
                 else:
                     assets = json.loads(assets_json)
                 for page in assets:
@@ -327,12 +340,12 @@ class ConfigFlowOperateCenter():
                             }
                         bp_assets[bp['type_id']][bp_type].append(bp)
 
-            # 获取公司运行中的job
+            # 获取公司的蓝图资产
             if director:
                 assets_json = await rds.r.get(f"bp_assets_cor_{director.corporation_id}")
                 if not assets_json:
                     assets = await eveesi.corporations_corporation_id_blueprints(director.ac_token, director.corporation_id)
-                    await rds.r.set(f"bp_assets_cor_{director.corporation_id}", json.dumps(assets), ex=15)
+                    await rds.r.set(f"bp_assets_cor_{director.corporation_id}", json.dumps(assets), ex=15 * 60)
                 else:
                     assets = json.loads(assets_json)
                 for page in assets:
@@ -436,7 +449,44 @@ class ConfigFlowOperateCenter():
 
         return fake_bp
 
+    async def get_bp_status(self, type_id: int):
+        if not self._bp_prepare:
+            await self.prepare_bp_asset()
+        
+        bp_type_id = await BPManager.get_bp_id_by_prod_typeid(type_id)
+        bpc_list = self._bp_asset.get(bp_type_id, {}).get("bpc", [])
+        bpo_list = self._bp_asset.get(bp_type_id, {}).get("bpo", [])
+
+        bp_quantity = len(bpc_list) + len(bpo_list)
+        bp_jobs = {
+            "bpc": sum([bpc["runs"] for bpc in bpc_list]),
+            "bpo": len(bpo_list)
+        }
+
+        return bp_quantity, bp_jobs
+
+    async def get_type_assign_structure_info(self, type_id: int):
+        if type_id in self.type_assign_structure_info_cache:
+            return self.type_assign_structure_info_cache[type_id]
+
+        res, conf = await self._is_match_keyword(self.structure_assign_confs, type_id)
+        if res:
+            # 获取建筑
+            structure_name = conf['structure_name']
+            if structure_name not in self._structure_info:
+                structure_infos = await NAU.get_structure_nodes()
+                for info in structure_infos:
+                    if info['structure_name'] == structure_name:
+                        self._structure_info[structure_name] = info
+                        break
+            structure_info = self._structure_info[structure_name]
+            self.type_assign_structure_info_cache[type_id] = structure_info
+            return structure_info
+        return None
+
     async def get_efficiency(self, type_id: int):
+        if type_id in self.type_eff_cache:
+            return self.type_eff_cache[type_id]
         # 建筑
         structure_eff = {
             "mater_eff": 1,
@@ -503,10 +553,11 @@ class ConfigFlowOperateCenter():
         else:
             raise KahunaException(f"活动类型{active_type}不存在")
 
-        return (
+        self.type_eff_cache[type_id] = (
             structure_eff['mater_eff'] * structure_rig_eff['mater_eff'],
             structure_eff['time_eff'] * structure_rig_eff['time_eff'] * skill_eff['time_eff']
         )
+        return self.type_eff_cache[type_id]
 
     async def get_conf_eff(self, type_id: int):
         if f"get_conf_eff_{type_id}" in self.cache:
@@ -605,3 +656,94 @@ class ConfigFlowOperateCenter():
             self._running_asset_allocate[(type_id, index_id)] = quantity
 
         return self._running_asset_allocate[(type_id, index_id)]
+
+    async def refresh_system_cost(self):
+        async with refresh_system_cost_lock:
+            if await rds.r.get(f"system_cost_cache:status") == "ok":
+                return
+                
+            result = await eveesi.industry_systems(log=True)
+
+            for item in result:
+                data = {"solar_system_id": item["solar_system_id"]}
+                for cost in item["cost_indices"]:
+                    data[cost["activity"]] = cost["cost_index"]
+                await rds.r.hset(f"system_cost_cache:{item['solar_system_id']}", mapping=data)
+
+            # 过期时间到下一个整小时
+            now = time.time()
+            next_hour = (int(now) // 3600 + 1) * 3600
+            ex_seconds = int(next_hour - now)
+            # 确保过期时间至少为1秒
+            if ex_seconds <= 0:
+                ex_seconds = 3600  # 如果计算错误，默认1小时
+            await rds.r.set(f"system_cost_cache:status", "ok", ex=ex_seconds)
+
+    async def get_system_cost(self, solar_system_id: int):
+        if not self._system_cost_status and await rds.r.get(f"system_cost_cache:status") != "ok":
+            await self.refresh_system_cost()
+
+            system_cost = await rds.r.hgetall(f"system_cost_cache:{solar_system_id}")
+            self._system_cost[solar_system_id] = system_cost
+
+            return system_cost
+
+        if solar_system_id in self._system_cost:
+            return self._system_cost[solar_system_id]
+
+        system_cost = await rds.r.hgetall(f"system_cost_cache:{solar_system_id}")
+        if not system_cost:
+            return {
+                "manufacturing": 0.14,
+                "reaction": 0.14
+            }
+        self._system_cost[solar_system_id] = system_cost
+        return system_cost
+
+    async def refresh_market_price(self):
+        async with refresh_market_price_lock:
+            if await rds.r.get(f"market_price_cache:status") == "ok":
+                return
+
+        results = await eveesi.markets_prices(log=True)
+        # results = [{'adjusted_price': 36.93619227019693, 'average_price': 33.77, 'type_id': 18}, ...]
+        for data in results:
+            if 'adjusted_price' not in data:
+                data['adjusted_price'] = 0.0
+            if  'average_price' not in data:
+                data['average_price'] = 0.0
+
+            await rds.r.hset(f"market_price_cache:{data['type_id']}", mapping=data)
+
+        # 获取到明天0点的时间间隔，单位分钟
+        now = time.time()
+        # 获取当前时间的struct_time
+        now_struct = time.localtime(now)
+        # 构造明天0点的struct_time
+        tomorrow_zero_struct = time.struct_time((
+            now_struct.tm_year,
+            now_struct.tm_mon,
+            now_struct.tm_mday + 1,
+            0, 0, 0,
+            now_struct.tm_wday,
+            now_struct.tm_yday,
+            now_struct.tm_isdst,
+        ))
+        # 转换为时间戳
+        tomorrow_zero_ts = time.mktime(tomorrow_zero_struct)
+        ex_seconds = int(tomorrow_zero_ts - now)
+        # 确保过期时间至少为1秒
+        if ex_seconds <= 0:
+            ex_seconds = 86400  # 如果计算错误，默认24小时（1天）
+        await rds.r.set(f"market_price_cache:status", "ok", ex=ex_seconds)
+
+    async def get_type_adjust_price(self, type_id: int):
+        if not self._market_price_status and await rds.r.get(f"market_price_cache:status") != "ok":
+            await self.refresh_market_price()
+
+        if type_id in self._type_adjust_price:
+            return self._type_adjust_price[type_id]
+
+        type_adjust_price = float(await rds.r.hget(f"market_price_cache:{type_id}", "adjusted_price"))
+        self._type_adjust_price[type_id] = type_adjust_price
+        return type_adjust_price
