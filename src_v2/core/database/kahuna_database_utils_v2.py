@@ -26,10 +26,14 @@ class _AsyncIteratorWrapper:
         self._generator = generator
         self._session = session
         self._closed = False
+        self._result = None  # 保存 result 引用，防止被垃圾回收
     
     @classmethod
     async def from_stmt(cls, stmt):
         """基于给定的 SQLAlchemy 语句创建会话并返回异步迭代器包装器"""
+        if not dbm._session_maker:
+            raise RuntimeError("数据库未初始化，请先调用 init() 方法")
+        
         session = dbm._session_maker()  # pyright: ignore[reportOptionalCall]
         result = await session.execute(stmt)
 
@@ -42,7 +46,9 @@ class _AsyncIteratorWrapper:
                 await session.rollback()
                 raise
 
-        return cls(generator(), session)
+        wrapper = cls(generator(), session)
+        wrapper._result = result  # 保存 result 引用
+        return wrapper
     
     def __aiter__(self):
         return self
@@ -77,21 +83,35 @@ class _AsyncIteratorWrapper:
         """清理资源"""
         if not self._closed:
             self._closed = True
+            # 先关闭生成器
             try:
-                # 尝试关闭生成器
                 if hasattr(self._generator, 'aclose'):
                     try:
                         await self._generator.aclose()
-                    except Exception:
+                    except (StopAsyncIteration, GeneratorExit):
                         pass
-            except Exception:
-                pass
-            # 关闭 session
+                    except Exception as e:
+                        logger.warning(f"关闭生成器时出错: {e}")
+            except Exception as e:
+                logger.warning(f"清理生成器时出错: {e}")
+            
+            # 确保 session 被正确关闭并返回到连接池
             if self._session:
                 try:
+                    # 如果 session 还有未提交的事务，先回滚
+                    if self._session.in_transaction():
+                        try:
+                            await self._session.rollback()
+                        except Exception as e:
+                            logger.warning(f"回滚事务时出错: {e}")
+                    # 关闭 session，将连接返回到连接池
                     await self._session.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"关闭 session 时出错: {e}")
+            
+            # 清理引用
+            self._session = None
+            self._result = None
     
     async def aclose(self):
         """显式关闭（保持向后兼容）"""
@@ -103,7 +123,14 @@ class _AsyncIteratorWrapper:
             # 注意：在 __del__ 中不能使用 await，所以这里只是标记
             # 实际清理由 asyncio 的事件循环处理
             # 如果对象被垃圾回收时还未关闭，会在事件循环中产生警告
-            pass
+            # 记录警告以便调试
+            import warnings
+            warnings.warn(
+                f"_AsyncIteratorWrapper 对象被垃圾回收时 session 尚未关闭。"
+                f"请确保使用 'async with' 上下文管理器或显式调用 aclose()。",
+                ResourceWarning,
+                stacklevel=2
+            )
 
 
 class _CommonUtils:

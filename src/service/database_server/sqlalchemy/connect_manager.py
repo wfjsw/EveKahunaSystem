@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeMeta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 from sqlalchemy import event
-from win32gui import PostThreadMessage
+# from win32gui import PostThreadMessage
 
 from redis.asyncio import Redis
 

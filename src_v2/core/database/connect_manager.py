@@ -519,12 +519,20 @@ class PostgreDatabaseManager():
         session = self._session_maker()
         try:
             yield session
-            await session.commit()  # 如果没有异常，提交事务
+            # 如果没有异常，提交事务
+            if session.in_transaction():
+                await session.commit()
         except Exception:
-            await session.rollback()  # 如果有异常，回滚事务
+            # 如果有异常，回滚事务
+            if session.in_transaction():
+                await session.rollback()
             raise
         finally:
-            await session.close()  # 无论如何都要关闭会话
+            # 无论如何都要关闭会话，将连接返回到连接池
+            try:
+                await session.close()
+            except Exception as e:
+                logger.warning(f"关闭数据库会话时出错: {e}")
 
     async def close(self):
         """关闭数据库连接"""

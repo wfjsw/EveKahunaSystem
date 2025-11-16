@@ -196,9 +196,33 @@ async def pull_asset_now():
     data = await request.json
     asset_owner_type = data.get('asset_owner_type')
     asset_owner_id = data.get('asset_owner_id')
+    
+    # 获取上次拉取时间（异步操作）
+    last_pull_time_str = await rdm.r.get(f"asset_pull_mission_last_pull_time:{asset_owner_type}:{asset_owner_id}")
+    
+    # 如果存在上次拉取时间，检查是否在15分钟内
+    if last_pull_time_str:
+        try:
+            # 将字符串转换为 datetime 对象
+            last_pull_time = datetime.fromisoformat(last_pull_time_str.replace('Z', '+00:00'))
+            # 获取当前北京时间（与存储的格式一致）
+            current_time = get_beijing_utctime(datetime.now())
+            # 确保时区一致
+            if last_pull_time.tzinfo is None:
+                last_pull_time = last_pull_time.replace(tzinfo=timezone.utc)
+            if current_time.tzinfo is None:
+                current_time = current_time.replace(tzinfo=timezone.utc)
+            # 计算时间差
+            time_diff = current_time - last_pull_time
+            if time_diff < timedelta(minutes=15):
+                return jsonify({'code': 400, 'message': '每15分钟只能拉取一次'}), 400
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"解析上次拉取时间失败: {e}")
 
     asyncio.create_task(start_pull_asset_now(asset_owner_type, asset_owner_id))
 
+    # 设置本次拉取时间（异步操作）
+    await rdm.r.set(f"asset_pull_mission_last_pull_time:{asset_owner_type}:{asset_owner_id}", get_beijing_utctime(datetime.now()).isoformat())
     return jsonify({'code': 200, 'message': '任务启动成功'}), 200
 
 @api_EVE_asset_bp.route('/getAssetPullMissionStatus', methods=['POST'])

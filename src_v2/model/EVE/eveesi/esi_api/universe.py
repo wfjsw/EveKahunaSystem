@@ -3,6 +3,7 @@ import asyncio
 from ..esi_req_manager import esi_request
 from ..eveutils import FORBIDDEN_ERROR, get_request_async, OUT_PAGE_ERROR, FORBIDDEN_ERROR
 from src_v2.core.utils import tqdm_manager
+from src_v2.core.log import logger
 
 # Get structure information
 # get
@@ -20,6 +21,9 @@ async def universe_structures_structure(access_token, structure_id: int, log=Tru
     solar_system_id
     type_id
     """
+    if structure_id < 10000000:
+        logger.warning(f"建筑id不会小于10000000，{structure_id} 可能为空间站id")
+        return None
     if not isinstance(access_token, str):
         ac_token = await access_token
     else:

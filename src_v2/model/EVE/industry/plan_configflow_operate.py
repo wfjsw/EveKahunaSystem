@@ -322,7 +322,8 @@ class ConfigFlowOperateCenter():
                 if not assets_json:
                     character = await CharacterManager().get_character_by_character_id(character_id)
                     assets = await eveesi.characters_character_id_blueprints(character.ac_token, character_id)
-                    await rds.r.set(f"bp_assets_cha_{character_id}", json.dumps(assets), ex=15 * 60)
+                    if assets:
+                        await rds.r.set(f"bp_assets_cha_{character_id}", json.dumps(assets), ex=15 * 60)
                 else:
                     assets = json.loads(assets_json)
                 for page in assets:
@@ -345,7 +346,8 @@ class ConfigFlowOperateCenter():
                 assets_json = await rds.r.get(f"bp_assets_cor_{director.corporation_id}")
                 if not assets_json:
                     assets = await eveesi.corporations_corporation_id_blueprints(director.ac_token, director.corporation_id)
-                    await rds.r.set(f"bp_assets_cor_{director.corporation_id}", json.dumps(assets), ex=15 * 60)
+                    if assets:
+                        await rds.r.set(f"bp_assets_cor_{director.corporation_id}", json.dumps(assets), ex=15 * 60)
                 else:
                     assets = json.loads(assets_json)
                 for page in assets:
@@ -507,6 +509,7 @@ class ConfigFlowOperateCenter():
 
         # 找到物品分配的建筑
         res, conf = await self._is_match_keyword(self.structure_assign_confs, type_id)
+        active_type = await BPManager.get_activity_id_by_product_typeid(type_id)
         if res:
             # 获取建筑
             structure_name = conf['structure_name']
@@ -533,8 +536,7 @@ class ConfigFlowOperateCenter():
             elif structure_info['structure_type'] == 'Athanor':
                 structure_eff['mater_eff'] *= 1
                 structure_eff['time_eff'] *= SMALL_STRUCTURE_REAC_TIME_EFF
-
-            active_type = await BPManager.get_activity_id_by_product_typeid(type_id)
+            
             # 建筑插
             for rig_conf in self.structure_rig_confs:
                 if rig_conf['structure_id'] == structure_info['item_id']:

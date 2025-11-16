@@ -10,7 +10,8 @@ from src_v2.core.config.config import config
 # import logger
 from src_v2.core.log import logger
 
-LOCAL_HTTP_ADD = config.get("EVE", "CALLBACK_LOCAL_ADD", fallback=None)
+CALLBACK_LOCAL_HOST = config.get("EVE", "CALLBACK_LOCAL_HOST", fallback=None)
+# LOCAL_HTTP_ADD = config.get("EVE", "CALLBACK_LOCAL_ADD", fallback=None)
 CALL_BACK_API = "/api/EVE/oauth/callback"
 
 PROXY_ADD = config.get("APP", "PROXY", fallback=None)
@@ -23,7 +24,7 @@ if PROXY_ADD and PROXY_PORT:
 else:
     PROXY = None
 
-callback_url = LOCAL_HTTP_ADD + CALL_BACK_API
+callback_url = "https://" + CALLBACK_LOCAL_HOST + CALL_BACK_API if CALLBACK_LOCAL_HOST else None
 
 oauth = OAuth2Session(
     client_id=config['EVE']['CLIENT_ID'],

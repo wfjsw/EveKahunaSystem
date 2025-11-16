@@ -10,7 +10,7 @@ from src_v2.core.database.connect_manager import redis_manager
 from src_v2.core.user.user_manager import UserManager
 from src.service.log_server import logger
 
-from src_v2.model.EVE.eveesi.oauth import get_auth_url, get_token, LOCAL_HTTP_ADD
+from src_v2.model.EVE.eveesi.oauth import get_auth_url, get_token, CALLBACK_LOCAL_HOST
 from src_v2.model.EVE.character.character_manager import CharacterManager
 
 # app = Quart(__name__)
@@ -119,7 +119,7 @@ async def eve_oauth_callback():
         await redis_manager.redis.hset(f"esi_auth_status:user_{user_id}", mapping={"authStatus": "success", "characterName": character.character_name})
         await redis_manager.redis.expire(f"esi_auth_status:user_{user_id}", 300) # 5分钟
         # 完成后，将用户重定向回前端应用程序
-        frontend_redirect_url = LOCAL_HTTP_ADD + "/setting/characterSetting/auth/close"
+        frontend_redirect_url = "https://" + CALLBACK_LOCAL_HOST + "/setting/characterSetting/auth/close" if CALLBACK_LOCAL_HOST else None
         return redirect(frontend_redirect_url)
 
     except Exception as e:

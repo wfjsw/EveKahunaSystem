@@ -1,6 +1,6 @@
 import { fileURLToPath, URL } from 'node:url'
 
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
@@ -16,7 +16,13 @@ export default defineConfig(async ({ command, mode }) => {
   if (isDev && !process.env.DISABLE_DEVTOOLS) {
     try {
       const vueDevTools = await import('vite-plugin-vue-devtools')
-      plugins.push(vueDevTools.default())
+      const devToolsPlugin = vueDevTools.default
+      if (devToolsPlugin && typeof devToolsPlugin === 'function') {
+        const plugin = devToolsPlugin()
+        if (plugin) {
+          plugins.push(plugin as Plugin)
+        }
+      }
     } catch (error) {
       // 忽略错误，继续构建
     }

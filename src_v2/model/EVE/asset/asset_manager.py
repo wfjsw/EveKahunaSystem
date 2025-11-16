@@ -377,7 +377,7 @@ class AssetManager(metaclass=SingletonMeta):
                 else:
                     logger.debug(f"建筑{forbidden_structure_node["item_id"]}无权限，创建无权限建筑")
                     structure_info_cache = {
-                        'name': f'Forbidden {SdeUtils.get_name_by_id(forbidden_structure_node['type_id'])}',
+                        'name': f'Forbidden {SdeUtils.get_name_by_id(forbidden_structure_node['type_id']) if "type_id" in forbidden_structure_node else "unknown"}',
                         'owner_id': 'unknown',
                         'solar_system_id': 'unknown',
                         'type_id': 'unknown',
@@ -408,10 +408,10 @@ class AssetManager(metaclass=SingletonMeta):
                 'structure_name': structure_info["name"],
                 'structure_type': SdeUtils.get_name_by_id(structure_info['type_id']) if structure_info['type_id'] != 'unknown' else 'unknown',
                 'structure_type_id': structure_info['type_id'] if structure_info['type_id'] != 'unknown' else 'unknown',
-                'system_id': system_info['system_id'],
-                'system_name': system_info['system_name'],
-                'region_id': system_info['region_id'],
-                'region_name': system_info['region_name'],
+                'system_id': solar_system_node['system_id'],
+                'system_name': solar_system_node['system_name'],
+                'region_id': solar_system_node['region_id'],
+                'region_name': solar_system_node['region_name'],
             }
             forbidden_structure_node.update({
                 "type_id": structure_node['structure_type_id'],
@@ -437,6 +437,7 @@ class AssetManager(metaclass=SingletonMeta):
             if not structure_info_cache:
                 structure_info = await eveesi.universe_structures_structure(access_character.ac_token, node["item_id"])
                 if structure_info:
+                    logger.info(f"建筑{node["item_id"]} 获取到建筑信息")
                     system_info = SdeUtils.get_system_info_by_id(structure_info["solar_system_id"])
                     structure_info_cache = {
                         "name": structure_info["name"],
@@ -465,6 +466,7 @@ class AssetManager(metaclass=SingletonMeta):
             structure_info = structure_info_cache
             if "system_id" not in structure_info:
                 logger.error(f"建筑{node["item_id"]}无星系信息，跳过更新")
+                logger.error(structure_info)
             structure_node = {
                 'structure_id': node["item_id"],
                 'structure_name': structure_info["name"],
@@ -519,7 +521,12 @@ class AssetManager(metaclass=SingletonMeta):
         async for mission in await EveAssetPullMissionDBUtils.select_all_by_user_name(user_name):
             owner_id_list.append(mission.asset_owner_id)
 
-        # TODO 如果公司开放且不包含，则新增 
+        # TODO 如果公司开放且不包含，则新增, 先无条件开放
+        main_character_id = await UserManager().get_main_character_id(user_name)
+        main_character = await CharacterManager().get_character_by_character_id(main_character_id)
+        if main_character.corporation_id:
+            corp_id = main_character.corporation_id
+            owner_id_list.append(corp_id)
 
         # 图搜索符合的节点，返回路径
         paths = await NAU.search_container_by_item_name(owner_id_list, type_id)

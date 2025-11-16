@@ -1,6 +1,7 @@
 import argparse
 import sys
 import asyncio
+import platform
 from pathlib import Path
 
 from hypercorn.config import Config
@@ -32,6 +33,20 @@ async def main():
     config = Config()
     config.bind = [f"{args.host}:{args.port}"]
 
+    # 配置 worker 模式：优先使用 uvloop（性能更好），否则使用 asyncio
+    # 注意：uvloop 在 Windows 上不支持，会自动回退到 asyncio
+    if platform.system() != "Windows":
+        try:
+            import uvloop
+            config.worker_class = "uvloop"
+            print("[性能优化] 使用 uvloop 事件循环（高性能模式）")
+        except ImportError:
+            config.worker_class = "asyncio"
+            print("[默认模式] 使用 asyncio 事件循环（安装 uvloop 可提升性能：pip install uvloop）")
+    else:
+        config.worker_class = "asyncio"
+        print("[Windows 模式] 使用 asyncio 事件循环（uvloop 不支持 Windows）")
+
     if args.dev:
         # 🔥 关键点：Hypercorn 0.18 就是用这个重载
         config.use_reloader = True
@@ -43,6 +58,17 @@ async def main():
     # 初始化数据库和基础服务
     await init_database()
     await init_esi_manager()
+
+    from src_v2.core.database.connect_manager import redis_manager
+    # await redis_manager.r.flushall()
+
+    # TODO 市场信息节点初始化，参数控制。
+    # from src_v2.model.EVE.industry.industry_manager import MarketTree
+    # await MarketTree.init_market_tree()
+    # await MarketTree.link_type_to_market_group()
+    # TODO 蓝图信息节点初始化，参数控制。
+    # from src_v2.model.EVE.industry.blueprint import BPManager
+    # await BPManager.init_bp_data_to_neo4j()
 
     # 初始化 Quart App
     app = get_app()

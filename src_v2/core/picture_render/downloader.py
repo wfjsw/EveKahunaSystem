@@ -1,5 +1,5 @@
 import aiohttp
-
+import os
 
 class IconDownloader:
     
@@ -9,6 +9,8 @@ class IconDownloader:
             async with session.get(url, ssl=False, timeout=aiohttp.ClientTimeout(total=10)) as response:
                 if response.status == 200:
                     content = await response.read()
+                    if not os.path.exists(os.path.dirname(save_path)):
+                        os.makedirs(os.path.dirname(save_path))
                     with open(save_path, 'wb') as f:
                         f.write(content)
                     return save_path

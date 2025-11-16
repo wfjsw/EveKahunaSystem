@@ -282,43 +282,30 @@ const group_keyword_type = ref('')
 const before_fetch_group_suggestions = (keyword_type: string) => {
     console.log("before_fetch_group_suggestions keyword_type", keyword_type)
     group_keyword_type.value = keyword_type
+    
 }
-interface KeywordItem {
+
+interface TypeItem {
     value: string
 }
-const get_group_suggestions = async (keyword_type: string) => {
-    console.log("get_group_suggestions keyword_type", keyword_type)
-    if (group_keyword_map.value[keyword_type]?.length > 0) {
-        console.log("get_group_suggestions group_keyword_map.value[keyword_type]", group_keyword_map.value[keyword_type])
-        return { data: group_keyword_map.value[keyword_type] }
-    }
-
+const Suggestions = ref<TypeItem[]>([])
+const fetchGroupSuggestions = async (queryString: string, cb: (suggestions: TypeItem[]) => void) => {
+    // const data = await get_group_suggestions(group_keyword_type.value)
     const res = await http.post('/EVE/industry/getGroupSuggestions', {
-        assign_type: keyword_type
+        assign_type: group_keyword_type.value,
+        query: queryString
     })
     const data = await res.json()
-    console.log("get_group_suggestions data", data)
-    // 缓存数据
-    if (data.data) {
-        group_keyword_map.value[keyword_type] = data.data
-    }
-    return data
-}
-
-const fetchGroupSuggestions = async (queryString: string, cb: (suggestions: KeywordItem[]) => void) => {
-    const data = await get_group_suggestions(group_keyword_type.value)
-    
     console.log("data", data)
-    const suggestions = data.data || []
-    const results = queryString && Array.isArray(suggestions)
-    ? suggestions.filter(suggestionFilter(queryString))
-    : []
+    Suggestions.value = data.data
+    const results = queryString
+    ? Suggestions.value : []
     console.log("results", results)
 
     cb(results)
 }
 const suggestionFilter = (queryString: string) => {
-    return (suggestion: KeywordItem) => {
+    return (suggestion: TypeItem) => {
         return suggestion.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0
     }
 }
@@ -377,7 +364,9 @@ const StructureContainerPermissionCreateFilter = (queryString: string) => {
   }
 }
 const fetchContainerPermissionSuggestions = async (queryString: string, cb: (suggestions: ContainerPermissionItem[]) => void) => {
-    const res = await http.get('/EVE/industry/getUserAllContainerPermission')
+    const res = await http.post('/EVE/industry/getUserAllContainerPermission', {
+        force_refresh: false
+    })
     const data = await res.json()
     console.log("fetchContainerPermissionSuggestions data", data)
     ContainerPermissionSuggestions.value = data.data

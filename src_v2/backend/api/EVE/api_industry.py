@@ -17,6 +17,7 @@ from src_v2.model.EVE.industry.industry_manager import IndustryManager
 from src_v2.core.database.neo4j_utils import Neo4jIndustryUtils as NIU
 from src_v2.core.utils import KahunaException
 from src_v2.model.EVE.industry.plan_configflow_operate import ConfigFlowOperateCenter
+from src_v2.model.EVE.sde.utils import SdeUtils
 
 api_industry_bp = Blueprint('api_industry', __name__, url_prefix='/api/EVE/industry')
 
@@ -258,10 +259,14 @@ async def add_industrypermision():
         logger.error(f"新增许可失败: {traceback.format_exc()}")
         return jsonify({"message": "新增许可失败", "status": 500}), 500
 
-@api_industry_bp.route("/getUserAllContainerPermission", methods=["GET"])
+@api_industry_bp.route("/getUserAllContainerPermission", methods=["POST"])
 @auth_required
 async def get_user_all_container_permission():
     user_id = g.current_user["user_id"]
+    data = await request.json
+    force_refresh = data.get("force_refresh", False)
+    if force_refresh:
+        await redis_manager.redis.delete(f'container_permission:{user_id}:all_container_permission')
 
     try:
         all_container_permission = await IndustryManager.get_user_all_container_permission(user_id)
@@ -286,8 +291,9 @@ async def delete_industrypermision():
 @api_industry_bp.route("/getStructureList", methods=["GET"])
 @auth_required
 async def get_structure_list():
+    user_id = g.current_user["user_id"]
     try:
-        structure_list = await IndustryManager.get_structure_list()
+        structure_list = await IndustryManager.get_structure_list(user_id)
         return jsonify({"data": structure_list, "status": 200})
     except:
         logger.error(f"获取建筑列表失败: {traceback.format_exc()}")
@@ -300,7 +306,7 @@ async def get_structure_assign_keyword_suggestions():
     user_id = g.current_user["user_id"]
 
     try:
-        assign_keyword_suggestions = await IndustryManager.get_structure_assign_keyword_suggestions(data["assign_type"])
+        assign_keyword_suggestions = await IndustryManager.get_structure_assign_keyword_suggestions(data["assign_type"], data["query"])
         return jsonify({"data": assign_keyword_suggestions, "status": 200})
     except:
         logger.error(f"获取建筑分配关键字建议失败: {traceback.format_exc()}")
@@ -318,6 +324,19 @@ async def get_type_list():
     except:
         logger.error(f"获取类型列表失败: {traceback.format_exc()}")
         return jsonify({"error": "获取类型列表失败", "status": 500}), 500
+
+@api_industry_bp.route("/getTypeSuggestionsList", methods=["POST"])
+@auth_required
+async def get_type_suggestions_list():
+    data = await request.json
+    
+    try:
+        type_suggestions_list = SdeUtils.fuzz_type(data["type_name"], list_len=10)
+        type_suggestions_list = [{"value": item, "label": item} for item in type_suggestions_list]
+        return jsonify({"data": type_suggestions_list, "status": 200})
+    except:
+        logger.error(f"获取类型建议列表失败: {traceback.format_exc()}")
+        return jsonify({"error": "获取类型建议列表失败", "status": 500}), 500
 
 @api_industry_bp.route("/createConfigFlowConfig", methods=["POST"])
 @auth_required

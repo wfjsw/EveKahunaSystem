@@ -6,7 +6,8 @@ from cachetools import TTLCache, cached
 from unicodedata import category
 
 from . import database as en_model, database_cn as zh_model
-from .database import InvTypes, InvGroups, InvCategories, MapSolarSystems
+from .database import InvTypes, InvGroups, InvCategories, MapSolarSystems, IndustryBlueprints
+from .database_cn import InvGroups as InvGroups_zh, MetaGroups as MetaGroups_zh, InvCategories as InvCategories_zh, IndustryBlueprints as IndustryBlueprints_zh, MarketGroups as MarketGroups_zh
 from .database import MetaGroups, MarketGroups
 from src_v2.core.log import logger
 
@@ -14,6 +15,29 @@ from .database_cn import InvTypes as InvTypes_zh
 
 en_invtype_name_list = [res.typeName for res in InvTypes.select(InvTypes.typeName).where(InvTypes.marketGroupID != 0)]
 zh_invtype_name_list = [res.typeName for res in InvTypes_zh.select(InvTypes_zh.typeName).where(InvTypes_zh.marketGroupID != 0)]
+
+en_invgroup_name_list = [res.groupName for res in InvGroups.select(InvGroups.groupName)]
+zh_invgroup_name_list = [res.groupName for res in InvGroups_zh.select(InvGroups_zh.groupName)]
+
+en_meta_name_list = [res.nameID for res in MetaGroups.select(MetaGroups.nameID)]
+zh_meta_name_list = [res.nameID for res in MetaGroups_zh.select(MetaGroups_zh.nameID)]
+
+query = (IndustryBlueprints
+        .select(InvTypes.typeName)
+        .join(InvTypes, on=(IndustryBlueprints.blueprintTypeID == InvTypes.typeID))
+        .where(InvTypes.marketGroupID != None))
+en_blueprint_name_list = [res.invtypes.typeName for res in query]
+query_zh = (IndustryBlueprints_zh
+            .select(InvTypes_zh.typeName)
+            .join(InvTypes_zh, on=(IndustryBlueprints_zh.blueprintTypeID == InvTypes_zh.typeID))
+            .where(InvTypes_zh.marketGroupID != None))
+zh_blueprint_name_list = [res.invtypes.typeName for res in query_zh]
+
+en_market_group_name_list = [res.nameID for res in MarketGroups.select(MarketGroups.nameID)]
+zh_market_group_name_list = [res.nameID for res in MarketGroups_zh.select(MarketGroups_zh.nameID)]
+
+en_category_name_list = [res.categoryName for res in InvCategories.select(InvCategories.categoryName)]
+zh_category_name_list = [res.categoryName for res in InvCategories_zh.select(InvCategories_zh.categoryName)]
 
 
 class SdeUtils:
@@ -335,6 +359,116 @@ class SdeUtils:
             return SdeUtils.fuzz_zh_type(item_name, list_len)
         else:
             return SdeUtils.fuzz_en_type(item_name, list_len)
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_zh_group(item_name, list_len = 5) -> list[str]:
+        choice = zh_invgroup_name_list
+        result = process.extract(item_name, choice, scorer=fuzz.token_sort_ratio, limit=list_len)
+        return [res[0] for res in result]
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_en_group(item_name, list_len = 5) -> list[str]:
+        choice = en_invgroup_name_list
+        result = process.extract(item_name, choice, scorer=fuzz.token_sort_ratio, limit=list_len)
+        return [res[0] for res in result]
+
+    @staticmethod
+    def fuzz_group(item_name, list_len = 5) -> list[str]:
+        if SdeUtils.maybe_chinese(item_name):
+            return SdeUtils.fuzz_zh_group(item_name, list_len)
+        else:
+            return SdeUtils.fuzz_en_group(item_name, list_len)
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_zh_meta(item_name, list_len = 5) -> list[str]:
+        choice = zh_meta_name_list
+        result = process.extract(item_name, choice, scorer=fuzz.token_sort_ratio, limit=list_len)
+        return [res[0] for res in result]
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_en_meta(item_name, list_len = 5) -> list[str]:
+        choice = en_meta_name_list
+        result = process.extract(item_name, choice, scorer=fuzz.token_sort_ratio, limit=list_len)
+        return [res[0] for res in result]
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_meta(item_name, list_len = 5) -> list[str]:
+        if SdeUtils.maybe_chinese(item_name):
+            return SdeUtils.fuzz_zh_meta(item_name, list_len)
+        else:
+            return SdeUtils.fuzz_en_meta(item_name, list_len)
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_blueprint(item_name, list_len = 5) -> list[str]:
+        if SdeUtils.maybe_chinese(item_name):
+            return SdeUtils.fuzz_zh_blueprint(item_name, list_len)
+        else:
+            return SdeUtils.fuzz_en_blueprint(item_name, list_len)
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_zh_blueprint(item_name, list_len = 5) -> list[str]:
+        choice = zh_blueprint_name_list
+        result = process.extract(item_name, choice, scorer=fuzz.token_sort_ratio, limit=list_len)
+        return [res[0] for res in result]
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_en_blueprint(item_name, list_len = 5) -> list[str]:
+        choice = en_blueprint_name_list
+        result = process.extract(item_name, choice, scorer=fuzz.token_sort_ratio, limit=list_len)
+        logger.info(f"input: {item_name}, fuzz_en_blueprint result: {result}")
+        return [res[0] for res in result]
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_market_group(item_name, list_len = 5) -> list[str]:
+        if SdeUtils.maybe_chinese(item_name):
+            return SdeUtils.fuzz_zh_market_group(item_name, list_len)
+        else:
+            return SdeUtils.fuzz_en_market_group(item_name, list_len)
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_zh_market_group(item_name, list_len = 5) -> list[str]:
+        choice = zh_market_group_name_list
+        result = process.extract(item_name, choice, scorer=fuzz.token_sort_ratio, limit=list_len)
+        return [res[0] for res in result]
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_en_market_group(item_name, list_len = 5) -> list[str]:
+        choice = en_market_group_name_list
+        result = process.extract(item_name, choice, scorer=fuzz.token_sort_ratio, limit=list_len)
+        return [res[0] for res in result]
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_category(item_name, list_len = 5) -> list[str]:
+        if SdeUtils.maybe_chinese(item_name):
+            return SdeUtils.fuzz_zh_category(item_name, list_len)
+        else:
+            return SdeUtils.fuzz_en_category(item_name, list_len)
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_zh_category(item_name, list_len = 5) -> list[str]:
+        choice = zh_category_name_list
+        result = process.extract(item_name, choice, scorer=fuzz.token_sort_ratio, limit=list_len)
+        return [res[0] for res in result]
+
+    @lru_cache(maxsize=200)
+    @staticmethod
+    def fuzz_en_category(item_name, list_len = 5) -> list[str]:
+        choice = en_category_name_list
+        result = process.extract(item_name, choice, scorer=fuzz.token_sort_ratio, limit=list_len)
+        return [res[0] for res in result]
 
     @staticmethod
     def get_all_type_id_in_market():

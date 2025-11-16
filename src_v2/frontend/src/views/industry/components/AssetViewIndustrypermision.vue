@@ -24,8 +24,9 @@ const handleSearchItemCountForm = ref<HandleSearchItemCountForm>({
     data: []
 })
 const handleSearchItemCountdialog = () => {
-    handleSearchItemCountdialogVisible.value = true
     console.log("handleSearchItemCount")
+    handleSearchItemCountdialogVisible.value = true
+    console.log("handleSearchItemCountdialogVisible", handleSearchItemCountdialogVisible.value)
 }
 
 const handleSearchItemCount = async () => {
@@ -43,8 +44,9 @@ const handleSearchItemCount = async () => {
     // handleSearchItemCountForm.value.container_id = data.data.container_id
 }
 
-const handleSearchContainerdialog = () => {
-    console.log("handleSearchContainer")
+const handleSearchContainer = async () => {
+    await getUserAllContainerPermission(true)
+    console.log("handleSearchContainer complete")
 }
 
 const handleAddIndustrypermision = async (row: any) => {
@@ -65,20 +67,25 @@ const handleAddIndustrypermision = async (row: any) => {
     ElMessage.success(data.message)
     handleSearchItemCountdialogLoading.value = false
     handleSearchItemCountdialogVisible.value = false
-    getUserAllContainerPermission()
+    await getUserAllContainerPermission(true)
 }
 
 const userContainerPermission = ref([])
 const userContainerPermissionLoading = ref(false)
-const getUserAllContainerPermission = async () => {
+const getUserAllContainerPermission = async ( force_refresh = false ) => {
+    console.log("getUserAllContainerPermission in")
     userContainerPermissionLoading.value = true
-    const res = await http.get('/EVE/industry/getUserAllContainerPermission')
+    const res = await http.post('/EVE/industry/getUserAllContainerPermission', {
+        force_refresh: force_refresh
+    })
     const data = await res.json()
+    console.log("getUserAllContainerPermission data", data)
     if (data.status !== 200) {
         userContainerPermissionLoading.value = false
         ElMessage.error(data.message)
         return
     }
+    console.log("getUserAllContainerPermission data.data", data.data)
     userContainerPermission.value = data.data
     userContainerPermissionLoading.value = false
 }
@@ -94,7 +101,7 @@ const handleDeleteIndustrypermision = async (row: any) => {
         return
     }
     ElMessage.success(data.message)
-    getUserAllContainerPermission()
+    await getUserAllContainerPermission(true)
     console.log("handleDeleteIndustrypermision", row)
 }
 
@@ -102,25 +109,20 @@ const handleViewContent = (row: any) => {
     console.log("handleViewContent", row)
 }
 
-const TypeSuggestionsCreateFilter = (queryString: string) => {
-  return (restaurant: TypeItem) => {
-    return (
-      restaurant.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0
-    )
-  }
-}
 
 interface TypeItem {
     value: string
 }
 const TypeSuggestions = ref<TypeItem[]>([])
 const fetchTypeSuggestions = async (queryString: string, cb: (suggestions: TypeItem[]) => void) => {
-    const res = await http.get('/EVE/industry/getTypeList')
+    const res = await http.post('/EVE/industry/getTypeSuggestionsList', {
+        type_name: queryString
+    })
     const data = await res.json()
 
     TypeSuggestions.value = data.data
     const results = queryString
-    ? TypeSuggestions.value.filter(TypeSuggestionsCreateFilter(queryString))
+    ? TypeSuggestions.value
     : []
 
     cb(results)
@@ -134,7 +136,7 @@ onMounted(async () => {
     <div style="display: flex; flex-direction: horizontal; gap: 10px;">
         <div style="min-width: 300px;">
             <el-button type="primary" @click="handleSearchItemCountdialog">搜索物品数目新增许可</el-button>
-            <el-button type="primary" @click="handleSearchContainerdialog">检索容器新增许可</el-button>
+            <el-button type="primary" @click="handleSearchContainer">检索容器新增许可</el-button>
             <el-table
                 :data="userContainerPermission"
                 border

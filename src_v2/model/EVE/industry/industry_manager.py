@@ -357,13 +357,13 @@ class IndustryManager(metaclass=SingletonMeta):
         for node in node_dict.values():
             # 计算库存
             type_id = node['type_id']
-            if plan_settings['considerate_asset']:
+            if plan_settings.get('considerate_asset', False):
                 product_assets_quantity = await op.get_type_assets_quantity(type_id)
                 node["store_quantity"] = product_assets_quantity
                 node['real_quantity'] -= product_assets_quantity
 
             # 计算运行中任务产物
-            if plan_settings['considerate_running_job']:
+            if plan_settings.get('considerate_running_job', False):
                 running_jobs = await op.get_running_job_count(type_id)
                 unfinish_output = running_jobs * await BPM.get_bp_product_quantity_typeid(type_id)
                 node['real_quantity'] -= unfinish_output
@@ -664,7 +664,7 @@ class IndustryManager(metaclass=SingletonMeta):
  
         # 库存 数量处理 每个(product_type_id, index)只计算一次 ==============================================================================================
         
-        if plan_settings['considerate_asset']:
+        if plan_settings.get('considerate_asset', False):
             all_index_real_quantity -= await op.get_type_assets_quantity(product_type_id)
             self_index_real_quantity = await op.deal_asset_quantity(self_index_real_quantity, product_type_id, self_index_id)
         #     product_asset_quantity = await op.get_type_assets_quantity(product_type_id)
@@ -672,7 +672,7 @@ class IndustryManager(metaclass=SingletonMeta):
 
         # 运行中任务生产 数量处理 每个(product_type_id, index)只计算一次 ==============================================================================================
         
-        if plan_settings['considerate_running_job']:
+        if plan_settings.get('considerate_running_job', False):
             all_index_real_quantity -= await op.get_running_job_count(product_type_id) * await BPM.get_bp_product_quantity_typeid(product_type_id)
             self_index_real_quantity = await op.deal_running_job_quantity(self_index_real_quantity, product_type_id, self_index_id)
         #     running_jobs_runs = await op.get_running_job_count(product_type_id)
@@ -707,7 +707,7 @@ class IndustryManager(metaclass=SingletonMeta):
         real_work_list = []
         if (product_type_id, self_index_id) not in op.work_list_cache:
             op.work_list_cache[(product_type_id, self_index_id)] = ([], [])
-            if plan_settings['split_to_jobs']:
+            if plan_settings.get('split_to_jobs', False):
                 max_job_run = await op.get_max_job_run(product_type_id)
 
 
@@ -720,19 +720,19 @@ class IndustryManager(metaclass=SingletonMeta):
                     #   如果是whole, 取min(蓝图支持的流程， min_all_index_real_quantity_work, max_job_run)
                     #   如果是in_order, 取min(蓝图支持的流程， real_work_waiting_to_split, max_job_run)
                     #       如果bpc不切分，则上两个min不考虑max_job_run
-                    bp = await op.get_bp_object(product_type_id, real_work_waiting_to_split, plan_settings['considerate_bp_relation'])
+                    bp = await op.get_bp_object(product_type_id, real_work_waiting_to_split, plan_settings.get('considerate_bp_relation', False))
 
                     if bp['fake'] or bp["runs"] < 0:
                         bp_support_runs = max_job_run
                     else:
                         bp_support_runs = bp["runs"]
 
-                    if plan_settings["full_use_bp_cp"] and bp["runs"] > 0:
+                    if plan_settings.get("full_use_bp_cp", False) and bp["runs"] > 0:
                         max_job_run = bp_support_runs
 
-                    if plan_settings["work_type"] == "whole":
+                    if plan_settings.get("work_type", "whole") == "whole":
                         this_round_work = min(bp_support_runs, op.set_uped_jobs[product_type_id], max_job_run)
-                    elif plan_settings["work_type"] == "in_order":
+                    elif plan_settings.get("work_type", "whole") == "in_order":
                         this_round_work = min(bp_support_runs, real_work_waiting_to_split, max_job_run)
 
                     real_work_list.append({
@@ -962,6 +962,10 @@ class IndustryManager(metaclass=SingletonMeta):
     
     @classmethod
     async def get_user_all_container_permission(cls, user_id: str):
+        cache_str = await rdm.r.get(f'container_permission:{user_id}:all_container_permission')
+        if cache_str:
+            return json.loads(cache_str)
+
         all_container_permission = []
         async for container in await EveIndustryAssetContainerPermissionDBUtils.select_all_by_user_name(user_id):
             pull_mission = await EveAssetPullMissionDBUtils.select_mission_by_owner_id(container.asset_owner_id)
@@ -995,11 +999,15 @@ class IndustryManager(metaclass=SingletonMeta):
             }
             all_container_permission.append(container)
 
-
+        await rdm.r.set(f'container_permission:{user_id}:all_container_permission', json.dumps(all_container_permission), ex=60*60)
         return all_container_permission
 
     @classmethod
-    async def get_structure_list(cls):
+    async def get_structure_list(cls, user_id: str):
+        cache_str = await rdm.r.get(f'structure_suggestions:{user_id}:structure_list')
+        if cache_str:
+            return json.loads(cache_str)
+
         structure_list = await NAU.get_structure_nodes()
         res = [
             {
@@ -1007,34 +1015,27 @@ class IndustryManager(metaclass=SingletonMeta):
                 "structure_name": structure["structure_name"],
             } for structure in structure_list
         ]
+        await rdm.r.set(f'structure_suggestions:{user_id}:structure_list', json.dumps(res), ex=60*60)
         return res
 
     @classmethod
-    async def get_structure_assign_keyword_suggestions(cls, assign_type: str):
+    async def get_structure_assign_keyword_suggestions(cls, assign_type: str, query):
         output = []
         if assign_type == 'group':
-            output.extend([{"value": res.groupName, "label": res.groupName} for res in InvGroups.select(InvGroups.groupName)])
-            output.extend([{"value": res.groupName, "label": res.groupName} for res in InvGroups_zh.select(InvGroups_zh.groupName)])
+            group_fuzz_list = SdeUtils.fuzz_group(query, list_len=10)
+            output.extend([{"value": item, "label": item} for item in group_fuzz_list])
         elif assign_type == 'meta':
-            output.extend([{"value": res.nameID, "label": res.nameID} for res in MetaGroups.select(MetaGroups.nameID)])
-            output.extend([{"value": res.nameID, "label": res.nameID} for res in MetaGroups_zh.select(MetaGroups_zh.nameID)])
+            meta_fuzz_list = SdeUtils.fuzz_meta(query, list_len=10)
+            output.extend([{"value": item, "label": item} for item in meta_fuzz_list])
         elif assign_type == 'blueprint':
-            query = (IndustryBlueprints
-                    .select(InvTypes.typeName)
-                    .join(InvTypes, on=(IndustryBlueprints.blueprintTypeID == InvTypes.typeID))
-                    .where(InvTypes.marketGroupID != None))
-            output.extend([{"value": res.invtypes.typeName, "label": res.invtypes.typeName} for res in query])
-            query_zh = (IndustryBlueprints_zh
-                       .select(InvTypes_zh.typeName)
-                       .join(InvTypes_zh, on=(IndustryBlueprints_zh.blueprintTypeID == InvTypes_zh.typeID))
-                       .where(InvTypes_zh.marketGroupID != None))
-            output.extend([{"value": res.invtypes.typeName, "label": res.invtypes.typeName} for res in query_zh])
+            blueprint_fuzz_list = SdeUtils.fuzz_blueprint(query, list_len=10)
+            output.extend([{"value": item, "label": item} for item in blueprint_fuzz_list])
         elif assign_type == 'marketGroup':
-            output.extend([{"value": res.nameID, "label": res.nameID} for res in MarketGroups.select(MarketGroups.nameID)])
-            output.extend([{"value": res.nameID, "label": res.nameID} for res in MarketGroups_zh.select(MarketGroups_zh.nameID)])
+            market_group_fuzz_list = SdeUtils.fuzz_market_group(query, list_len=10)
+            output.extend([{"value": item, "label": item} for item in market_group_fuzz_list])
         elif assign_type == 'category':
-            output.extend([{"value": res.categoryName, "label": res.categoryName} for res in InvCategories.select(InvCategories.categoryName)])
-            output.extend([{"value": res.categoryName, "label": res.categoryName} for res in InvCategories_zh.select(InvCategories_zh.categoryName)])
+            category_fuzz_list = SdeUtils.fuzz_category(query, list_len=10)
+            output.extend([{"value": item, "label": item} for item in category_fuzz_list])
 
         return output
 

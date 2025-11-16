@@ -316,6 +316,7 @@ class BPManager:
             asyncio.create_task(process_with_semaphore(product_typeid)) for product_typeid in product_typeids
         ]
         await asyncio.gather(*tasks)
+        await tqdm_manager.complete_mission("init_bp_data_to_neo4j")
 
     @classmethod
     async def fill_bp_node_and_link_child(cls, product_typeid: int, finished_set: set, root=False):

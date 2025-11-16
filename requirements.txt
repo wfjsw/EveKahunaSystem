@@ -23,6 +23,7 @@ quart==0.20.0
 quart_auth==0.11.0
 quart_schema==0.22.0
 hypercorn==0.17.0
+uvloop>=0.19.0; sys_platform != "win32"  # 高性能事件循环（Windows 不支持）
 requests_oauthlib==2.0.0
 thefuzz==0.22.1
 toml==0.10.2

@@ -253,7 +253,7 @@ def esi_request(func):
                 return await func(*args, **kwargs)
             except Exception as e:
                 logger.error(f"执行ESI函数时出错: {str(e)}", exc_info=True)
-                raise e
+                raise None
 
         req = EsiRequest(execute_func, args, kwargs, future)
 
