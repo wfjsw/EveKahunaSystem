@@ -735,7 +735,7 @@ watch(
                 </el-select>
             </el-form-item>
             <el-form-item label="最大流程" v-if="configForm.MaxJobSplitCountConf.judge_type === 'count'">
-                <el-input-number v-model="configForm.MaxJobSplitCountConf.max_count" placeholder="请输入最大作业数量" :min="0" :max="100" />
+                <el-input-number v-model="configForm.MaxJobSplitCountConf.max_count" placeholder="请输入最大作业数量" :min="0" />
                 <!-- 预估时间 -->
             </el-form-item>
             <el-form-item label="最长时间" v-if="configForm.MaxJobSplitCountConf.judge_type === 'time'">

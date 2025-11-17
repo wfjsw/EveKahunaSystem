@@ -1093,11 +1093,18 @@ class IndustryManager(metaclass=SingletonMeta):
     async def get_config_flow_config_list(cls, user_id: str):
         res_list = []
         async for config in await EveIndustryPlanConfigFlowConfigDBUtils.select_all_by_user_name(user_id):
-            res_list.append({
+            config_data = {
                 "config_id": config.id,
                 "config_type": config.config_type,
                 "config_value": config.config_value
-            })
+            }
+            if config.config_type == 'StructureRigConfig':
+                structure_info = await NIU.get_structure_node_by_id(config.config_value['structure_id'])
+                config_data['config_value'] = {
+                    "structure_name": structure_info.get('structure_name', None),
+                    "structure_id": config.config_value
+                }
+            res_list.append(config_data)
         return res_list
 
     @classmethod
@@ -1140,8 +1147,6 @@ class IndustryManager(metaclass=SingletonMeta):
             if config.config_type == 'StructureRigConfig':
                 structure_info = await NIU.get_structure_node_by_id(config.config_value['structure_id'])
                 config_list[-1]['config_value']['structure_name'] = structure_info.get('structure_name', None)
-            logger.info(type(config.config_value))
-            logger.info(config.config_value)
         return config_list
 
     @classmethod
