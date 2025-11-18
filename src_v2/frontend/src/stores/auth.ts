@@ -102,13 +102,14 @@ export const useAuthStore = defineStore('auth', () => {
       // 向后端发送登录请求（统一HTTP封装，内置401/403处理）
       const response = await http.post('/auth/login', credentials)
 
-      // 如果响应不是 2xx，抛出错误
-      if (!response.ok) {
-        throw new Error('登录失败')
-      }
-
-      // 解析后端返回的数据（应包含 token 和 user 信息）
+      // 解析后端返回的数据（应包含 status、token 和 user 信息）
       const data = await response.json()
+
+      // 检查 status 是否为 200
+      if (data.status !== 200) {
+        error.value = data.message || '登录失败'
+        return { success: false, error: error.value }
+      }
 
       // 保存 token 和用户信息到状态和 localStorage
       token.value = data.token
@@ -165,10 +166,18 @@ export const useAuthStore = defineStore('auth', () => {
       // 用统一HTTP封装请求当前用户信息
       const response = await http.get('/auth/me')
 
-      if (response.ok) {
-        // token 有效，保存用户信息
-        const userData = await response.json()
-        user.value = userData
+      // 解析后端返回的数据
+      const data = await response.json()
+
+      // 检查 status 是否为 200
+      if (data.status === 200) {
+        // token 有效，保存用户信息（后端返回的数据结构包含 id, username, roles）
+        user.value = {
+          id: data.id,
+          username: data.username,
+          email: '', // 后端没有返回 email，保持空字符串
+          roles: data.roles
+        }
         // 刷新缓存
         lastAuthCheckAtMs.value = Date.now()
         lastAuthCheckResult.value = true

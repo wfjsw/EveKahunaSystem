@@ -9,3 +9,22 @@ tmp
 config.ini
 *.sql
 **/*.pyc
+
+# IDE and editor files
+.cursor/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment and credentials
+credentials.json
+.python-version
+uv.lock
+
+# Build and cache
+.vite/
+node_modules/
+dist/
+build/
+*.log

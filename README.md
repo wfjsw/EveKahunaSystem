@@ -144,7 +144,8 @@ kahunabot/
 │   │   └── user_server/   # 用户管理模块
 │   └── utils/             # 工具模块
 ├── data/                   # 数据库存放目录，可选用
-├── config.ini.example     # 配置文件
+├── config.toml.example    # 配置文件模板 (TOML 格式)
+├── config.ini.example     # 配置文件模板 (INI 格式，已弃用，建议使用 TOML)
 ├── main.py                # 插件入口
 ├── filter.py              # 权限过滤器
 └── requirements.txt       # 依赖包列表
@@ -204,7 +205,13 @@ apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra fonts-arphic-ukai fonts-a
 
 #### 修改配置文件
 
-将`config.ini.example`复制一份，重命名为`config.ini`。
+**推荐使用 TOML 格式（新）**：
+将`config.toml.example`复制一份，重命名为`config.toml`，然后填写相应的配置值。
+
+**兼容 INI 格式（旧）**：
+如果 `config.toml` 不存在，系统会自动尝试读取 `config.ini`。将`config.ini.example`复制一份，重命名为`config.ini`。
+
+> **注意**：TOML 格式支持更好的注释和类型安全，建议新项目使用 TOML 格式。配置文件会自动向后兼容，如果 `config.toml` 不存在，会回退到 `config.ini`。
 
 ```ini
 [APP]

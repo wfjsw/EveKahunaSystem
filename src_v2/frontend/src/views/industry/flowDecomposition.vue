@@ -130,7 +130,7 @@ const getPlanCalculateResultTableViewStart = async () => {
         const data = await res.json()
         
         if (data.status !== 200) {
-            ElMessage.error(data.error || "启动计算失败")
+            ElMessage.error(data.message || "启动计算失败")
             return
         }
         
@@ -241,7 +241,7 @@ const getPlanCalculateResultTableViewResult = async (showMessage: boolean = true
         const data = await res.json()
         
         if (data.status !== 200) {
-            ElMessage.error(data.error || "获取数据失败")
+            ElMessage.error(data.message || "获取数据失败")
             return
         }
         

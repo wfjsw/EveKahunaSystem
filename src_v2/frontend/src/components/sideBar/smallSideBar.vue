@@ -1,44 +1,31 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { Setting } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
-import { useAuthStore } from '@/stores/auth'
+// 定义菜单项类型
+interface MenuItem {
+  id: number
+  icon: string
+  label: string
+  active: boolean
+  route: string
+}
 
+// 定义 props
+interface Props {
+  menuItems: MenuItem[]
+}
+
+const props = defineProps<Props>()
 const router = useRouter()
 
 // 侧边栏展开状态
 const isExpanded = ref(false)
 
-const authStore = useAuthStore()
-
-// 使用 computed 响应式地生成菜单项
-const menuItems = computed(() => {
-  const items: { id: number; icon: string; label: string; active: boolean; route: string }[] = []
-  let id_index = 1
-  
-  // 首页始终显示
-  items.push({ id: id_index++, icon: 'House', label: '首页', active: router.currentRoute.value.path === '/home' || router.currentRoute.value.path === '/', route: '/home' })
-
-  // 根据用户角色动态添加菜单项
-  const userRoles = authStore.user?.roles || []
-  if (userRoles.includes('user')) {
-    items.push({ id: id_index++, icon: 'Cpu', label: '工业', active: router.currentRoute.value.path.startsWith('/industry'), route: '/industry' })
-    items.push({ id: id_index++, icon: 'ShoppingBag', label: '公司商城', active: router.currentRoute.value.path === '/corpShop', route: '/corpShop' })
-    items.push({ id: id_index++, icon: 'Opportunity', label: '实用工具', active: router.currentRoute.value.path === '/utils', route: '/utils' })
-    items.push({ id: id_index++, icon: 'Setting', label: '设置', active: router.currentRoute.value.path.startsWith('/setting'), route: '/setting' })
-  }
-  console.log(userRoles)
-  if (userRoles.includes('admin')) {
-    items.push({ id: id_index++, icon: 'Cpu', label: '管理员', active: router.currentRoute.value.path.startsWith('/admin'), route: '/admin' })
-  }
-  
-  return items
-})
-
 // 切换菜单项激活状态
 const toggleActive = (itemId: number) => {
-  const targetRoute = menuItems.value.find(item => item.id === itemId)?.route || '/home'
+  const targetRoute = props.menuItems.find(item => item.id === itemId)?.route || '/home'
   router.push(targetRoute)
 }
 
@@ -72,7 +59,7 @@ const handleMouseLeave = () => {
   <el-scrollbar class="sidebar-scrollbar">
     <div class="menu-items">
       <div 
-        v-for="item in menuItems" 
+        v-for="item in props.menuItems" 
         :key="item.id"
         class="menu-item"
         :class="{ 'active': item.active }"

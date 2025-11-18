@@ -50,13 +50,7 @@ class EsiReqManager:
 
     async def stop(self):
         """停止请求处理协程"""
-        if self._queue_task and not self._queue_task.done():
-            self._queue_task.cancel()
-            try:
-                await self._queue_task
-            except asyncio.CancelledError:
-                pass
-            self.logger.info("ESI请求队列处理协程已停止")
+        # 先停止处理任务，因为它可能依赖队列任务
         if self._processing_task and not self._processing_task.done():
             self._processing_task.cancel()
             try:
@@ -64,6 +58,15 @@ class EsiReqManager:
             except asyncio.CancelledError:
                 pass
             self.logger.info("ESI处理队列处理协程已停止")
+        
+        # 然后停止队列任务
+        if self._queue_task and not self._queue_task.done():
+            self._queue_task.cancel()
+            try:
+                await self._queue_task
+            except asyncio.CancelledError:
+                pass
+            self.logger.info("ESI请求队列处理协程已停止")
 
     # 每个eis请求需要获得一个token，token每分钟300个。
     async def get_token(self):
@@ -151,10 +154,20 @@ class EsiReqManager:
 
         active_set = set()
         async def single_process(req):
-            result = await req.func()
-            req.future.set_result(result)
+            try:
+                result = await req.func()
+                if not req.future.done():
+                    req.future.set_result(result)
+            except Exception as e:
+                if not req.future.done():
+                    req.future.set_exception(e)
+                else:
+                    self.logger.error(f"Future already done when setting exception: {str(e)}", exc_info=True)
         def done_call_back(task):
-            active_set.discard(task)
+            try:
+                active_set.discard(task)
+            except Exception:
+                pass
 
         while True:
             # 如果队列为空，等待新请求
@@ -184,6 +197,9 @@ class EsiReqManager:
 
             except asyncio.CancelledError:
                 self.logger.info("ESI请求队列处理协程被取消")
+                # 等待所有活动任务完成
+                if active_set:
+                    await asyncio.gather(*active_set, return_exceptions=True)
                 # 将所有未处理的请求设置为取消状态
                 while self.processing_queue:
                     req = self.processing_queue.popleft()
@@ -253,7 +269,7 @@ def esi_request(func):
                 return await func(*args, **kwargs)
             except Exception as e:
                 logger.error(f"执行ESI函数时出错: {str(e)}", exc_info=True)
-                raise None
+                raise
 
         req = EsiRequest(execute_func, args, kwargs, future)
 
@@ -261,7 +277,11 @@ def esi_request(func):
         await esi_manager.add_request(req)
         
         # 等待请求完成并返回结果
-        return await future
+        try:
+            return await future
+        except Exception as e:
+            # 确保异常被正确传播
+            raise
     
     return wrapper
 

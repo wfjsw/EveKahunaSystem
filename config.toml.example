@@ -1,0 +1,275 @@
+# ============================================
+# KahunaBot 配置文件模板 (TOML 格式)
+# ============================================
+# 复制此文件为 config.toml 并填写相应的配置值
+
+[APP]
+# 数据库类型: sqlite, postgresql
+DBTYPE = "sqlite"
+
+# 成本计划用户ID
+COST_PLAN_USER = 0
+
+# 成本计划名称
+COST_PLAN_NAME = ""
+
+# 公司资产用户ID
+CORP_ASSET_USER = 0
+
+# 图片渲染代理 (留空则不使用)
+PIC_RENDER_PROXY = ""
+
+# 代理服务器地址
+PROXY = "127.0.0.1"
+
+# 代理端口
+PORT = 7890
+
+[FEISHU]
+# 飞书应用ID
+APP_ID = ""
+
+# 飞书密钥
+SECRET_ID = ""
+
+# 文件夹根目录ID
+FOLDER_ROOT = ""
+
+[GOOGLE]
+# Google API 凭证文件路径
+CREDENTIALS = ""
+
+# 市场监控电子表格ID
+MARKET_MONITOR_SPREADSHEET_ID = ""
+
+[POSTGREDB]
+# PostgreSQL 数据库配置
+Host = ""
+Port = 5432
+Database = ""
+User = ""
+Password = ""
+
+[REDIS]
+# Redis 配置
+Host = ""
+Port = 6379
+
+[NEO4J]
+# Neo4j 图数据库配置
+Host = ""
+Port = 7687
+Username = ""
+Password = ""
+
+[SQLITEDB]
+# SQLite 数据库文件路径
+CONFIG_DB = ""
+CACHE_DB = ""
+SDEDB = ""
+CN_SDEDB = ""
+
+[EVE]
+# EVE Online API 配置
+CLIENT_ID = ""
+SECRET_KEY = ""
+
+# 市场账户角色ID
+MARKET_AC_CHARACTER_ID = 0
+
+# 参考材料权重
+REF_MATER_WEIGHT = 0.3
+
+# 参考利润权重
+REF_PROFIT_WEIGHT = 0.7
+
+# 回调本地主机
+CALLBACK_LOCAL_HOST = ""
+
+# 回调本地地址
+CALLBACK_LOCAL_ADD = "https://localhost:9527/"
+
+[ESI]
+# ESI API 权限配置
+# 设置为 true 启用，false 禁用
+
+# 公共数据访问
+publicData = false
+
+# 日历相关权限
+"esi-calendar.respond_calendar_events.v1" = false
+"esi-calendar.read_calendar_events.v1" = false
+
+# 位置相关权限
+"esi-location.read_location.v1" = false
+"esi-location.read_ship_type.v1" = false
+
+# 邮件相关权限
+"esi-mail.organize_mail.v1" = false
+"esi-mail.read_mail.v1" = false
+"esi-mail.send_mail.v1" = false
+
+# 技能相关权限
+"esi-skills.read_skills.v1" = true
+"esi-skills.read_skillqueue.v1" = false
+
+# 钱包相关权限
+"esi-wallet.read_character_wallet.v1" = true
+"esi-wallet.read_corporation_wallet.v1" = false
+
+# 搜索相关权限
+"esi-search.search_structures.v1" = true
+
+# 克隆相关权限
+"esi-clones.read_clones.v1" = false
+
+# 角色相关权限
+"esi-characters.read_contacts.v1" = false
+
+# 宇宙相关权限
+"esi-universe.read_structures.v1" = true
+
+# 击杀邮件相关权限
+"esi-killmails.read_killmails.v1" = false
+
+# 公司相关权限
+"esi-corporations.read_corporation_membership.v1" = true
+
+# 资产相关权限
+"esi-assets.read_assets.v1" = true
+
+# 行星相关权限
+"esi-planets.manage_planets.v1" = false
+
+# 舰队相关权限
+"esi-fleets.read_fleet.v1" = false
+"esi-fleets.write_fleet.v1" = false
+
+# UI 相关权限
+"esi-ui.open_window.v1" = false
+"esi-ui.write_waypoint.v1" = false
+
+# 角色写入权限
+"esi-characters.write_contacts.v1" = false
+
+# 装配相关权限
+"esi-fittings.read_fittings.v1" = false
+"esi-fittings.write_fittings.v1" = false
+
+# 市场相关权限
+"esi-markets.structure_markets.v1" = true
+
+# 公司结构相关权限
+"esi-corporations.read_structures.v1" = false
+
+# 角色忠诚度相关权限
+"esi-characters.read_loyalty.v1" = false
+
+# 角色聊天频道相关权限
+"esi-characters.read_chat_channels.v1" = false
+
+# 角色勋章相关权限
+"esi-characters.read_medals.v1" = false
+
+# 角色声望相关权限
+"esi-characters.read_standings.v1" = false
+
+# 角色代理研究相关权限
+"esi-characters.read_agents_research.v1" = false
+
+# 工业相关权限
+"esi-industry.read_character_jobs.v1" = true
+
+# 市场订单相关权限
+"esi-markets.read_character_orders.v1" = true
+
+# 角色蓝图相关权限
+"esi-characters.read_blueprints.v1" = true
+
+# 角色公司角色相关权限
+"esi-characters.read_corporation_roles.v1" = true
+
+# 位置在线状态相关权限
+"esi-location.read_online.v1" = false
+
+# 合同相关权限
+"esi-contracts.read_character_contracts.v1" = false
+
+# 克隆植入体相关权限
+"esi-clones.read_implants.v1" = false
+
+# 角色疲劳相关权限
+"esi-characters.read_fatigue.v1" = false
+
+# 公司击杀邮件相关权限
+"esi-killmails.read_corporation_killmails.v1" = false
+
+# 公司成员跟踪相关权限
+"esi-corporations.track_members.v1" = false
+
+# 公司钱包相关权限
+"esi-wallet.read_corporation_wallets.v1" = false
+
+# 角色通知相关权限
+"esi-characters.read_notifications.v1" = false
+
+# 公司部门相关权限
+"esi-corporations.read_divisions.v1" = false
+
+# 公司联系人相关权限
+"esi-corporations.read_contacts.v1" = false
+
+# 公司资产相关权限
+"esi-assets.read_corporation_assets.v1" = true
+
+# 公司头衔相关权限
+"esi-corporations.read_titles.v1" = false
+
+# 公司蓝图相关权限
+"esi-corporations.read_blueprints.v1" = true
+
+# 公司合同相关权限
+"esi-contracts.read_corporation_contracts.v1" = false
+
+# 公司声望相关权限
+"esi-corporations.read_standings.v1" = false
+
+# 公司星基相关权限
+"esi-corporations.read_starbases.v1" = false
+
+# 公司工业相关权限
+"esi-industry.read_corporation_jobs.v1" = true
+
+# 公司市场订单相关权限
+"esi-markets.read_corporation_orders.v1" = false
+
+# 公司容器日志相关权限
+"esi-corporations.read_container_logs.v1" = false
+
+# 角色挖矿相关权限
+"esi-industry.read_character_mining.v1" = false
+
+# 公司挖矿相关权限
+"esi-industry.read_corporation_mining.v1" = false
+
+# 行星海关相关权限
+"esi-planets.read_customs_offices.v1" = false
+
+# 公司设施相关权限
+"esi-corporations.read_facilities.v1" = false
+
+# 公司勋章相关权限
+"esi-corporations.read_medals.v1" = false
+
+# 角色头衔相关权限
+"esi-characters.read_titles.v1" = false
+
+# 联盟联系人相关权限
+"esi-alliances.read_contacts.v1" = false
+
+# 角色FW统计相关权限
+"esi-characters.read_fw_stats.v1" = false
+
+# 公司FW统计相关权限
+"esi-corporations.read_fw_stats.v1" = false
+

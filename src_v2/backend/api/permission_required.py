@@ -26,6 +26,16 @@ def permission_required(req_permissions: list[str]):
             user_permissions = await permission_manager.get_user_permissions(user_id)
             permissions.extend(user_permissions)
 
+            # 检查permission，只有write的权限添加read
+            permissions_set = set(permissions)
+            for perm in list(permissions_set):
+                if perm.endswith(':write'):
+                    per_name = perm.rsplit(':', 1)[0]
+                    read_perm = f"{per_name}:read"
+                    if read_perm not in permissions_set:
+                        permissions_set.add(read_perm)
+            permissions = list(permissions_set)
+
             permission_access = all(perm in permissions for perm in req_permissions)
 
             # 检查权限

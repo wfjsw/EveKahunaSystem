@@ -1,11 +1,40 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import smallSideBar from './components/sideBar/smallSideBar.vue'
+import { computed } from 'vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
+
+// 定义公开页面列表（不需要认证和主布局）
+const publicPages = ['login', 'forbidden', 'characterAuthClose']
+const isPublicPage = computed(() => publicPages.includes(route.name as string))
+
+// 主菜单配置 - 使用 computed 响应式地生成菜单项
+const menuItems = computed(() => {
+  const items: { id: number; icon: string; label: string; active: boolean; route: string }[] = []
+  let id_index = 1
+  
+  // 首页始终显示
+  items.push({ id: id_index++, icon: 'House', label: '首页', active: router.currentRoute.value.path === '/home' || router.currentRoute.value.path === '/', route: '/home' })
+
+  // 根据用户角色动态添加菜单项
+  const userRoles = authStore.user?.roles || []
+  if (userRoles.includes('user')) {
+    items.push({ id: id_index++, icon: 'Cpu', label: '工业', active: router.currentRoute.value.path.startsWith('/industry'), route: '/industry' })
+    // items.push({ id: id_index++, icon: 'ShoppingBag', label: '公司商城', active: router.currentRoute.value.path === '/corpShop', route: '/corpShop' })
+    items.push({ id: id_index++, icon: 'Opportunity', label: '实用工具', active: router.currentRoute.value.path === '/utils', route: '/utils' })
+    items.push({ id: id_index++, icon: 'Setting', label: '设置', active: router.currentRoute.value.path.startsWith('/setting'), route: '/setting' })
+  }
+  if (userRoles.includes('admin')) {
+    items.push({ id: id_index++, icon: 'Cpu', label: '管理员', active: router.currentRoute.value.path.startsWith('/admin'), route: '/admin' })
+  }
+  
+  return items
+})
 
 const handleLogout = () => {
   authStore.logout()
@@ -15,13 +44,13 @@ const handleLogout = () => {
 
 <template>
   <div class="kahuna-container">
-    <!-- 登录页面不显示主布局 -->
-    <router-view v-if="$route.name === 'login'" />
+    <!-- 公开页面（登录页、403页面等）不显示主布局 -->
+    <router-view v-if="isPublicPage" />
     
     <!-- 主应用布局 - 确保用户信息已加载 -->
     <el-container v-else-if="authStore.isAuthenticated">
       <!-- 左侧窄侧边菜单 -->
-      <smallSideBar />
+      <smallSideBar :menu-items="menuItems" />
 
       <!-- 主内容区域 -->
       <el-container class="main-container">

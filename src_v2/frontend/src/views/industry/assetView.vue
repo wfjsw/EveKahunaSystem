@@ -65,9 +65,17 @@ const filteredOwnerOptions = computed(() => {
 })
 
 const getIsEditCorpSettingAllowed = async () => {
-  const response = await http.get('/EVE/asset/isEditCorpSettingAllowed')
-  const data = await response.json()
-  form.value.is_edit_corp_setting_allowed = data?.message || false
+  try {
+    const response = await http.get('/EVE/asset/isEditCorpSettingAllowed')
+    const data = await response.json()
+    if (data?.status === 200) {
+      form.value.is_edit_corp_setting_allowed = data?.message || false
+    } else {
+      ElMessage.error(data?.message || '获取权限信息失败')
+    }
+  } catch (e) {
+    ElMessage.error('获取权限信息失败')
+  }
 }
 
 const handleAllowPullPersonalAsset = async () => {
@@ -84,6 +92,10 @@ const fetchMissions = async () => {
   try {
     const res = await http.get('/EVE/asset/getAssetPullMissions')
     const data = await res.json()
+    if (data?.status !== 200) {
+      ElMessage.error(data?.message || '获取拉取任务失败')
+      return
+    }
     missions.value = Array.isArray(data?.data) ? data.data : []
   } catch (e) {
     ElMessage.error('获取拉取任务失败')
@@ -97,6 +109,10 @@ const fetchOwnerOptions = async () => {
   try {
     const res = await http.get('/EVE/asset/pullAssetOwners')
     const data = await res.json()
+    if (data?.status !== 200) {
+      ElMessage.error(data?.message || '获取主体列表失败')
+      return
+    }
     ownerOptions.value = Array.isArray(data?.data) ? data.data : []
   } catch (e) {
     ElMessage.error('获取主体列表失败')
@@ -150,7 +166,11 @@ const handleCloseMission = async (row: Mission) => {
       asset_owner_id: row.subject_id,
       active: false
     })
-    await res.json()
+    const data = await res.json()
+    if (data?.status !== 200) {
+      ElMessage.error(data?.message || '关闭任务失败')
+      return
+    }
     ElMessage.success('已关闭任务')
     fetchMissions()
   } catch (e) {
@@ -165,7 +185,11 @@ const handleStartMission = async (row: Mission) => {
       asset_owner_id: row.subject_id,
       active: true
     })
-    await res.json()
+    const data = await res.json()
+    if (data?.status !== 200) {
+      ElMessage.error(data?.message || '启动任务失败')
+      return
+    }
     ElMessage.success('已启动任务')
     fetchMissions()
   } catch (e) {
@@ -204,7 +228,7 @@ const pollPullStatus = async (row: Mission) => {
       asset_owner_id: row.subject_id
     })
     const data = await res.json()
-    if (data?.code === 200 && data?.data) {
+    if (data?.status === 200 && data?.data) {
       // 成功获取进度，重置重试计数器
       pollingRetries.value.delete(missionKey)
       
@@ -312,8 +336,8 @@ const handlePullMission = async (row: Mission) => {
       asset_owner_id: row.subject_id
     })
     const data = await res.json()
-    if (res.status !== 200) {
-      ElMessage.error('拉取任务失败')
+    if (data?.status !== 200) {
+      ElMessage.error(data?.message || '拉取任务失败')
       return
     }
 
@@ -351,7 +375,11 @@ const handleDeleteMission = async (row: Mission) => {
       asset_owner_type: row.subject_type,
       asset_owner_id: row.subject_id
     })
-    await res.json()
+    const data = await res.json()
+    if (data?.status !== 200) {
+      ElMessage.error(data?.message || '删除任务失败')
+      return
+    }
     ElMessage.success('已删除任务')
     fetchMissions()
   } catch (e) {
@@ -360,6 +388,12 @@ const handleDeleteMission = async (row: Mission) => {
 }
 
 const handleCreateMission = async () => {
+  // 暂不支持角色创建资产拉取任务
+  if (createForm.value.subject_type === 'character') {
+    ElMessage.error('暂不支持角色创建资产拉取任务')
+    return
+  }
+
   // 验证权限
   if (createForm.value.subject_type === 'corp' && !form.value.is_edit_corp_setting_allowed) {
     ElMessage.error('您没有权限创建公司资产拉取任务')
@@ -376,7 +410,11 @@ const handleCreateMission = async () => {
       active: createForm.value.start_immediately
     }
     const res = await http.post('/EVE/asset/createAssetPullMission', payload)
-    await res.json()
+    const data = await res.json()
+    if (data?.status !== 200) {
+      ElMessage.error(data?.message || '创建任务失败')
+      return
+    }
     ElMessage.success('创建任务成功')
     createDialogVisible.value = false
     // reset simple fields
@@ -473,6 +511,40 @@ const formatRemainingTime = (seconds: number): string => {
   return `还需等待 ${secs}秒`
 }
 
+// 格式化时间为北京时间（UTC+8）
+const formatBeijingTime = (timeStr: string | null | undefined): string => {
+  if (!timeStr) {
+    return '-'
+  }
+  try {
+    const date = new Date(timeStr)
+    if (isNaN(date.getTime())) {
+      return timeStr // 如果解析失败，返回原始字符串
+    }
+    // 使用 toLocaleString 转换为北京时间（Asia/Shanghai 时区），然后手动格式化
+    const formatter = new Intl.DateTimeFormat('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })
+    const parts = formatter.formatToParts(date)
+    const year = parts.find(p => p.type === 'year')?.value || ''
+    const month = parts.find(p => p.type === 'month')?.value || ''
+    const day = parts.find(p => p.type === 'day')?.value || ''
+    const hour = parts.find(p => p.type === 'hour')?.value || ''
+    const minute = parts.find(p => p.type === 'minute')?.value || ''
+    const second = parts.find(p => p.type === 'second')?.value || ''
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+  } catch (e) {
+    return timeStr // 如果出错，返回原始字符串
+  }
+}
+
 onMounted(async () => {
   getIsEditCorpSettingAllowed()
   fetchMissions()
@@ -537,7 +609,7 @@ onUnmounted(() => {
       </el-table-column>
       <el-table-column label="上次拉取时间" prop="last_pull_time" width="190px">
         <template #default="{ row }">
-          <span>{{ row.last_pull_time || '-' }}</span>
+          <span>{{ formatBeijingTime(row.last_pull_time) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="拉取状态" prop="pull_status" width="250px">

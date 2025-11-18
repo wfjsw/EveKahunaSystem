@@ -486,6 +486,16 @@ onUnmounted(() => {
         <el-row :gutter="20">
             <!-- 维度1：最终产品维度 -->
             <el-col :span="12">
+                <!-- 图表卡片 -->
+                <el-card class="cost-card">
+                    <template #header>
+                        <div class="card-header">
+                            <span>最终产品成本占比</span>
+                        </div>
+                    </template>
+                    <div ref="productChartRef" style="width: 100%; height: 400px;"></div>
+                </el-card>
+                <!-- 表格卡片 -->
                 <el-card class="cost-card">
                     <template #header>
                         <div class="card-header">
@@ -497,7 +507,6 @@ onUnmounted(() => {
                         stripe
                         border
                         style="width: 100%"
-                        :max-height="400"
                     >
                         <el-table-column prop="type_name" label="产品名称" width="200" />
                         <el-table-column prop="total_cost" label="生产数量" width="150">
@@ -531,12 +540,21 @@ onUnmounted(() => {
                             </template>
                         </el-table-column>
                     </el-table>
-                    <div ref="productChartRef" style="width: 100%; height: 400px; margin-top: 20px;"></div>
                 </el-card>
             </el-col>
             
             <!-- 维度2：分类维度 -->
             <el-col :span="12">
+                <!-- 图表卡片 -->
+                <el-card class="cost-card">
+                    <template #header>
+                        <div class="card-header">
+                            <span>材料分类成本占比</span>
+                        </div>
+                    </template>
+                    <div ref="categoryChartRef" style="width: 100%; height: 400px;"></div>
+                </el-card>
+                <!-- 表格卡片 -->
                 <el-card class="cost-card">
                     <template #header>
                         <div class="card-header">
@@ -548,7 +566,6 @@ onUnmounted(() => {
                         stripe
                         border
                         style="width: 100%"
-                        :max-height="400"
                     >
                         <el-table-column prop="category" label="分类" width="200" />
                         <el-table-column prop="total_cost" label="总成本" width="200">
@@ -562,7 +579,6 @@ onUnmounted(() => {
                             </template>
                         </el-table-column>
                     </el-table>
-                    <div ref="categoryChartRef" style="width: 100%; height: 400px; margin-top: 20px;"></div>
                 </el-card>
             </el-col>
         </el-row>
