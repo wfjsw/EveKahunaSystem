@@ -513,9 +513,32 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
         // 直接转换为字符串，保持原始值（数字不添加千位分隔符，方便粘贴到其他应用）
         const text = String(content)
         
-        // 复制到剪贴板
-        await navigator.clipboard.writeText(text)
-        ElMessage.success(`已复制${fieldName ? ` ${fieldName} ` : ' '}到剪贴板`)
+        // 优先使用 Clipboard API（需要 HTTPS 或 localhost）
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text)
+            ElMessage.success(`已复制${fieldName ? ` ${fieldName} ` : ' '}到剪贴板`)
+        } else {
+            // 降级方案：使用传统的 execCommand 方法
+            const textarea = document.createElement('textarea')
+            textarea.value = text
+            textarea.style.position = 'fixed'
+            textarea.style.left = '-9999px'
+            textarea.style.top = '-9999px'
+            document.body.appendChild(textarea)
+            textarea.select()
+            textarea.setSelectionRange(0, text.length) // 兼容移动设备
+            
+            try {
+                const successful = document.execCommand('copy')
+                if (successful) {
+                    ElMessage.success(`已复制${fieldName ? ` ${fieldName} ` : ' '}到剪贴板`)
+                } else {
+                    throw new Error('execCommand 复制失败')
+                }
+            } finally {
+                document.body.removeChild(textarea)
+            }
+        }
     } catch (error) {
         console.error('复制失败:', error)
         ElMessage.error('复制失败，请重试')
@@ -828,8 +851,8 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
                         </template>
                         <template #default="{ row }">
                             <div style="display: flex; align-items: center; justify-content: center;">
-                            <el-icon v-if="row.fake" size="20" style="color: #67c23a;"><CircleCloseFilled /></el-icon>
-                            <el-icon v-else size="20" style="color: #f56c6c;"><CircleCheckFilled /></el-icon>
+                            <el-icon v-if="row.fake" size="20" style="color: #f56c6c;"><CircleCloseFilled /></el-icon>
+                            <el-icon v-else size="20" style="color: #67c23a;"><CircleCheckFilled /></el-icon>
                             </div>
                         </template>
                     </el-table-column>
