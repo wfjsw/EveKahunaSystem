@@ -35,6 +35,16 @@ class PostgreDatabaseManager():
         self.engine = None
         self._session_maker = None
 
+    def _is_development_mode(self) -> bool:
+        """判断是否为开发环境"""
+        env_mode = os.getenv('ENVIRONMENT', '').lower()
+        return env_mode in ('dev', 'development', 'local')
+
+    def _is_production_mode(self) -> bool:
+        """判断是否为生产环境"""
+        env_mode = os.getenv('ENVIRONMENT', '').lower()
+        return env_mode in ('prod', 'production')
+
     async def _get_existing_table_structure(self, conn, table_name: str) -> dict:
         """获取数据库中已存在表的结构"""
         try:
@@ -158,6 +168,149 @@ class PostgreDatabaseManager():
             logger.error(f"删除表 {table_name} 失败: {e}")
             raise
 
+    def _extract_column_default(self, column):
+        """
+        提取列的默认值，返回可用于SQL的默认值字符串
+        
+        Args:
+            column: SQLAlchemy Column 对象
+            
+        Returns:
+            tuple: (default_value_sql, has_default) 
+                - default_value_sql: SQL字符串，如果为None表示无默认值
+                - has_default: 是否有默认值
+        """
+        from sqlalchemy.schema import ColumnDefault
+        # FunctionElement 可能在不同的SQLAlchemy版本中位置不同
+        # 使用 hasattr 检查而不是直接导入
+        
+        # 检查 server_default（数据库层面的默认值）
+        if column.server_default is not None:
+            if hasattr(column.server_default, 'arg'):
+                # 处理 text() 包装的默认值
+                default_arg = column.server_default.arg
+                if isinstance(default_arg, str):
+                    return default_arg, True
+                elif hasattr(default_arg, 'text'):
+                    return default_arg.text, True
+            return str(column.server_default), True
+        
+        # 检查 default（应用层面的默认值）
+        if column.default is not None:
+            default = column.default
+            # 处理 ColumnDefault 对象
+            if isinstance(default, ColumnDefault):
+                if hasattr(default, 'arg'):
+                    arg = default.arg
+                    # 处理函数调用（如 func.now()）
+                    # 检查是否是SQL函数元素（有compile方法）
+                    if hasattr(arg, 'compile') and callable(getattr(arg, 'compile', None)):
+                        try:
+                            # 编译为SQL
+                            from sqlalchemy.dialects import postgresql
+                            dialect = postgresql.dialect()
+                            compiled = arg.compile(dialect=dialect)
+                            return str(compiled), True
+                        except Exception as e:
+                            logger.warning(f"编译默认值函数失败: {e}")
+                            return None, False
+                    # 处理可调用对象
+                    elif callable(arg):
+                        try:
+                            value = arg()
+                            # 根据类型格式化
+                            if isinstance(value, str):
+                                return f"'{value}'", True
+                            elif isinstance(value, datetime):
+                                return f"'{value.isoformat()}'", True
+                            else:
+                                return str(value), True
+                        except Exception as e:
+                            logger.warning(f"执行默认值函数失败: {e}")
+                            return None, False
+                    # 处理静态值
+                    else:
+                        if isinstance(arg, str):
+                            return f"'{arg}'", True
+                        elif isinstance(arg, datetime):
+                            return f"'{arg.isoformat()}'", True
+                        else:
+                            return str(arg), True
+        
+        return None, False
+
+    async def _check_foreign_key_constraint_exists(self, conn, table_name: str, constraint_name: str) -> bool:
+        """检查外键约束是否已存在"""
+        query = text("""
+            SELECT COUNT(*) FROM information_schema.table_constraints 
+            WHERE constraint_name = :constraint_name 
+            AND table_name = :table_name
+            AND constraint_type = 'FOREIGN KEY'
+        """)
+        result = await conn.execute(query, {
+            "constraint_name": constraint_name,
+            "table_name": table_name
+        })
+        return result.scalar() > 0
+
+    async def _validate_foreign_key_data(self, conn, table_name: str, col_name: str, 
+                                         ref_table: str, ref_col: str) -> tuple:
+        """
+        验证外键数据完整性
+        
+        Returns:
+            tuple: (is_valid, invalid_count, invalid_samples)
+                - is_valid: 是否有效
+                - invalid_count: 违反约束的行数
+                - invalid_samples: 违反约束的示例数据（最多5条）
+        """
+        # 检查违反外键约束的数据
+        check_sql = text(f"""
+            SELECT t."{col_name}" 
+            FROM "{table_name}" t
+            WHERE t."{col_name}" IS NOT NULL 
+            AND NOT EXISTS (
+                SELECT 1 FROM "{ref_table}" r 
+                WHERE r."{ref_col}" = t."{col_name}"
+            )
+            LIMIT 5
+        """)
+        result = await conn.execute(check_sql)
+        invalid_samples = [row[0] for row in result]
+        
+        # 获取总数
+        count_sql = text(f"""
+            SELECT COUNT(*) 
+            FROM "{table_name}" t
+            WHERE t."{col_name}" IS NOT NULL 
+            AND NOT EXISTS (
+                SELECT 1 FROM "{ref_table}" r 
+                WHERE r."{ref_col}" = t."{col_name}"
+            )
+        """)
+        count_result = await conn.execute(count_sql)
+        invalid_count = count_result.scalar() or 0
+        
+        return invalid_count == 0, invalid_count, invalid_samples
+
+    def _get_foreign_key_constraint_sql(self, table_name: str, col_name: str, 
+                                        ref_table: str, ref_col: str, 
+                                        constraint_name: str, on_delete=None, on_update=None) -> str:
+        """生成外键约束SQL语句"""
+        sql = (
+            f'ALTER TABLE "{table_name}" '
+            f'ADD CONSTRAINT "{constraint_name}" '
+            f'FOREIGN KEY ("{col_name}") '
+            f'REFERENCES "{ref_table}" ("{ref_col}")'
+        )
+        
+        if on_delete:
+            sql += f' ON DELETE {on_delete}'
+        if on_update:
+            sql += f' ON UPDATE {on_update}'
+        
+        return sql
+
     async def _fix_sequence_for_table(self, conn, table_name: str, model_class):
         """
         检查并修复表的自增主键序列
@@ -270,6 +423,192 @@ class PostgreDatabaseManager():
                     logger.warning(f"无法创建保存点修复表 {table_name} 的列 {col_name} 序列: {e}")
                 # 不抛出异常，允许继续执行其他表的处理
 
+    async def _migrate_table_incremental(self, conn, table_name: str, model_class):
+        """
+        生产环境增量迁移：使用 ALTER TABLE 进行增量迁移，不删除表
+        
+        Args:
+            conn: 数据库连接对象
+            table_name: 表名
+            model_class: 模型类
+        """
+        is_dev = self._is_development_mode()
+        existing_structure = await self._get_existing_table_structure(conn, table_name)
+        model_structure = self._get_model_table_structure(model_class)
+        
+        # 1. 处理新增列
+        for col_name, col_info in model_structure.items():
+            if col_name not in existing_structure:
+                col = model_class.__table__.columns[col_name]
+                col_type = self._get_postgresql_type(col.type)
+                
+                # 步骤1：先添加为可空列
+                add_col_sql = text(f'ALTER TABLE "{table_name}" ADD COLUMN "{col_name}" {col_type}')
+                await conn.execute(add_col_sql)
+                logger.info(f"已添加可空列 {table_name}.{col_name}")
+                
+                # 步骤2：处理默认值
+                default_value_sql, has_default = self._extract_column_default(col)
+                if has_default and default_value_sql:
+                    # 填充现有数据的默认值
+                    update_sql = text(f'UPDATE "{table_name}" SET "{col_name}" = {default_value_sql} WHERE "{col_name}" IS NULL')
+                    result = await conn.execute(update_sql)
+                    row_count = result.rowcount if hasattr(result, 'rowcount') else 0
+                    logger.info(f"已为 {row_count} 行数据填充默认值 {table_name}.{col_name}")
+                
+                # 步骤3：数据完整性验证
+                check_null_sql = text(f'SELECT COUNT(*) FROM "{table_name}" WHERE "{col_name}" IS NULL')
+                null_count = await conn.execute(check_null_sql).scalar() or 0
+                
+                if null_count > 0:
+                    if not col.nullable:
+                        # 需要NOT NULL但没有默认值
+                        if not has_default:
+                            error_msg = (
+                                f"无法将列 {col_name} 设为 NOT NULL：\n"
+                                f"- 表 {table_name} 中存在 {null_count} 行数据该列为 NULL\n"
+                                f"- 模型定义中未提供默认值\n"
+                                f"- 请先手动填充数据或添加默认值后再迁移"
+                            )
+                            if is_dev:
+                                logger.warning(f"[开发模式] {error_msg}，将跳过NOT NULL约束")
+                            else:
+                                raise ValueError(error_msg)
+                        else:
+                            # 有默认值但未正确应用
+                            logger.warning(f"列 {col_name} 仍有 {null_count} 行NULL值，但已设置默认值，将尝试重新填充")
+                            update_sql = text(f'UPDATE "{table_name}" SET "{col_name}" = {default_value_sql} WHERE "{col_name}" IS NULL')
+                            await conn.execute(update_sql)
+                            # 再次检查
+                            null_count = await conn.execute(check_null_sql).scalar() or 0
+                            if null_count > 0:
+                                error_msg = f"列 {col_name} 仍有 {null_count} 行NULL值，无法添加NOT NULL约束"
+                                if is_dev:
+                                    logger.warning(f"[开发模式] {error_msg}，将跳过NOT NULL约束")
+                                else:
+                                    raise ValueError(error_msg)
+                
+                # 步骤4：添加NOT NULL约束（如果需要）
+                if not col.nullable and null_count == 0:
+                    alter_not_null_sql = text(f'ALTER TABLE "{table_name}" ALTER COLUMN "{col_name}" SET NOT NULL')
+                    await conn.execute(alter_not_null_sql)
+                    logger.info(f"已为列 {col_name} 添加 NOT NULL 约束")
+                
+                # 步骤5：设置数据库默认值（如果有server_default）
+                if col.server_default is not None:
+                    default_value_sql, _ = self._extract_column_default(col)
+                    if default_value_sql:
+                        alter_default_sql = text(f'ALTER TABLE "{table_name}" ALTER COLUMN "{col_name}" SET DEFAULT {default_value_sql}')
+                        await conn.execute(alter_default_sql)
+                        logger.info(f"已设置列 {col_name} 的数据库默认值")
+        
+        # 2. 添加外键约束
+        for col in model_class.__table__.columns:
+            for fk in col.foreign_keys:
+                fk_name = f'fk_{table_name}_{col.name}'
+                ref_table = fk.column.table.name
+                ref_col = fk.column.name
+                
+                # 检查约束是否已存在
+                if await self._check_foreign_key_constraint_exists(conn, table_name, fk_name):
+                    logger.info(f"外键约束 {fk_name} 已存在，跳过")
+                    continue
+                
+                # 检查引用表是否存在
+                ref_table_exists = await self._check_table_exists(conn, ref_table)
+                if not ref_table_exists:
+                    if is_dev:
+                        logger.warning(f"[开发模式] 引用表 {ref_table} 不存在，跳过外键约束 {fk_name}")
+                        continue
+                    else:
+                        raise ValueError(f"无法添加外键约束 {fk_name}：引用表 {ref_table} 不存在")
+                
+                # 检查引用列是否存在
+                ref_col_check = text("""
+                    SELECT COUNT(*) FROM information_schema.columns 
+                    WHERE table_name = :ref_table AND column_name = :ref_col
+                """)
+                ref_col_exists = await conn.execute(ref_col_check, {
+                    "ref_table": ref_table,
+                    "ref_col": ref_col
+                }).scalar() > 0
+                
+                if not ref_col_exists:
+                    raise ValueError(f"无法添加外键约束 {fk_name}：引用列 {ref_table}.{ref_col} 不存在")
+                
+                # 验证数据完整性
+                skip_validation = os.getenv("POSTGRE_FK_SKIP_VALIDATION", "false").lower() == "true"
+                if not skip_validation:
+                    is_valid, invalid_count, invalid_samples = await self._validate_foreign_key_data(
+                        conn, table_name, col.name, ref_table, ref_col
+                    )
+                    
+                    if not is_valid:
+                        error_msg = (
+                            f"无法添加外键约束 {fk_name}：\n"
+                            f"- 表 {table_name} 中存在 {invalid_count} 行数据违反外键约束\n"
+                            f"- 违反约束的示例数据：{invalid_samples[:5]}\n"
+                            f"- 请先清理或修正这些数据后再迁移"
+                        )
+                        if is_dev:
+                            logger.warning(f"[开发模式] {error_msg}，将跳过外键约束")
+                            continue
+                        else:
+                            raise ValueError(error_msg)
+                
+                # 添加外键约束
+                try:
+                    fk_sql = self._get_foreign_key_constraint_sql(
+                        table_name, col.name, ref_table, ref_col, fk_name
+                    )
+                    await conn.execute(text(fk_sql))
+                    logger.info(f"已为表 {table_name} 的列 {col.name} 添加外键约束 {fk_name}")
+                except Exception as e:
+                    if is_dev:
+                        logger.warning(f"[开发模式] 添加外键约束失败: {e}")
+                    else:
+                        raise
+        
+        # 3. 添加索引
+        for idx in model_class.__table__.indexes:
+            if idx.name and not idx.unique:
+                try:
+                    idx_cols = ', '.join([f'"{col.name}"' for col in idx.columns])
+                    create_idx_sql = text(
+                        f'CREATE INDEX IF NOT EXISTS "{idx.name}" '
+                        f'ON "{table_name}" ({idx_cols})'
+                    )
+                    await conn.execute(create_idx_sql)
+                    logger.info(f"已为表 {table_name} 添加索引 {idx.name}")
+                except Exception as e:
+                    logger.warning(f"添加索引失败: {e}")
+        
+        # 4. 处理隐式索引
+        for col in model_class.__table__.columns:
+            if hasattr(col, 'index') and col.index and not col.primary_key:
+                has_explicit_idx = False
+                for idx in model_class.__table__.indexes:
+                    if any(c.name == col.name for c in idx.columns):
+                        has_explicit_idx = True
+                        break
+                
+                if not has_explicit_idx:
+                    implicit_idx_name = f"{table_name}_{col.name}_idx"
+                    try:
+                        create_idx_sql = text(
+                            f'CREATE INDEX IF NOT EXISTS "{implicit_idx_name}" '
+                            f'ON "{table_name}" ("{col.name}")'
+                        )
+                        await conn.execute(create_idx_sql)
+                        logger.info(f"已为表 {table_name} 的列 {col.name} 添加隐式索引")
+                    except Exception as e:
+                        logger.warning(f"添加隐式索引失败: {e}")
+        
+        # 5. 修复序列
+        await self._fix_sequence_for_table(conn, table_name, model_class)
+        
+        logger.info(f"表 {table_name} 增量迁移完成")
+
     async def create_default_table(self, conn, base_class: Type[DeclarativeMeta]):
         """
         创建默认表结构，自动检查和同步表结构
@@ -278,9 +617,14 @@ class PostgreDatabaseManager():
             conn: 数据库连接对象
             base_class: declarative_base 创建的基类
         """
+        is_dev = self._is_development_mode()
+        is_prod = self._is_production_mode()
+        force_rebuild = os.getenv("POSTGRE_FORCE_REBUILD", "false").lower() == "true"
+        
         # 获取所有继承自该基类的模型
         tables_to_create = []
         tables_to_recreate = []
+        tables_to_migrate_incremental = []
 
         for mapper in base_class.registry.mappers:
             model_class = mapper.class_
@@ -297,8 +641,28 @@ class PostgreDatabaseManager():
                 model_structure = self._get_model_table_structure(model_class)
 
                 if not self._compare_table_structures(existing_structure, model_structure):
-                    logger.info(f"表 {table_name} 结构不一致，将重建")
-                    tables_to_recreate.append((table_name, model_class))
+                    logger.info(f"表 {table_name} 结构不一致")
+                    
+                    # 开发环境：如果表无数据，直接删除重建
+                    if is_dev:
+                        has_rows_query = text(f'SELECT EXISTS (SELECT 1 FROM "{table_name}" LIMIT 1)')
+                        has_rows_result = await conn.execute(has_rows_query)
+                        has_rows = bool(has_rows_result.scalar())
+                        
+                        if not has_rows:
+                            logger.info(f"[开发模式] 表 {table_name} 无数据，将直接删除重建")
+                            await self._drop_table(conn, table_name)
+                            tables_to_create.append((table_name, model_class))
+                            continue
+                    
+                    # 生产环境或开发环境有数据：使用增量迁移
+                    if is_prod or (is_dev and not force_rebuild):
+                        logger.info(f"表 {table_name} 将使用增量迁移")
+                        tables_to_migrate_incremental.append((table_name, model_class))
+                    else:
+                        # 开发环境且允许强制重建
+                        logger.info(f"表 {table_name} 将重建（强制重建模式）")
+                        tables_to_recreate.append((table_name, model_class))
                 else:
                     logger.info(f"表 {table_name} 结构一致，检查序列配置")
                     # 即使结构一致，也要检查并修复序列配置
@@ -315,15 +679,21 @@ class PostgreDatabaseManager():
                 existing_structure = await self._get_existing_table_structure(conn, table_name)
                 model_structure = self._get_model_table_structure(model_class)
 
-                # 校验：若存在新增且为 NOT NULL 的列，则直接抛出异常
+                # 校验：若存在新增且为 NOT NULL 的列
                 added_not_null_cols = [
                     col_name for col_name, info in model_structure.items()
                     if col_name not in existing_structure and info.get('nullable') is False
                 ]
-                if added_not_null_cols and os.getenv("POSTGRE_FORCE_REBUILD", "false").lower() != "true":
-                    raise ValueError(
-                        f"表 {table_name} 存在新增且为 NOT NULL 的列，无法安全迁移: {added_not_null_cols}"
-                    )
+                if added_not_null_cols:
+                    if is_dev or force_rebuild:
+                        logger.warning(
+                            f"[开发模式] 表 {table_name} 存在新增 NOT NULL 列: {added_not_null_cols}，"
+                            f"将使用默认值或允许 NULL 进行迁移"
+                        )
+                    elif not force_rebuild:
+                        raise ValueError(
+                            f"表 {table_name} 存在新增且为 NOT NULL 的列，无法安全迁移: {added_not_null_cols}"
+                        )
 
                 # 检查旧表是否有数据
                 has_rows_query = text(f'SELECT EXISTS (SELECT 1 FROM "{table_name}" LIMIT 1)')
@@ -438,6 +808,17 @@ class PostgreDatabaseManager():
             except Exception as e:
                 logger.error(f"表 {table_name} 迁移失败，回滚事务: {e}")
                 raise
+
+        # 执行增量迁移（生产环境或开发环境有数据时）
+        for table_name, model_class in tables_to_migrate_incremental:
+            try:
+                await self._migrate_table_incremental(conn, table_name, model_class)
+            except Exception as e:
+                logger.error(f"表 {table_name} 增量迁移失败: {e}")
+                if is_prod:
+                    raise
+                else:
+                    logger.warning(f"[开发模式] 增量迁移失败，将继续处理其他表: {e}")
 
         # 创建所有需要新建的表
         if tables_to_create:

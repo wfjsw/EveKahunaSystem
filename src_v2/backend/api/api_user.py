@@ -32,10 +32,12 @@ async def get_character_list():
                 "corpId": character.corporation_id,
                 "corpName": corp_data.name
             })
-        return jsonify({"data": character_list_dict})
+        return jsonify({"status": 200, "data": character_list_dict})
+    except KahunaException as e:
+        return jsonify({"status": 500, "message": str(e)}), 500
     except Exception as e:
-        logger.error(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"获取角色列表失败: {traceback.format_exc()}")
+        return jsonify({"status": 500, "message": "获取角色列表失败"}), 500
 
 @api_user_bp.route("/deleteCharacter", methods=["POST"])
 @auth_required
@@ -44,10 +46,12 @@ async def delete_character():
         data = await request.get_json()
         character_name = data.get("characterName")
         await CharacterManager().delete_character_by_character_name(character_name, g.current_user["user_id"])
-        return jsonify({"message": "角色删除成功"})
+        return jsonify({"status": 200, "message": "角色删除成功"})
+    except KahunaException as e:
+        return jsonify({"status": 500, "message": str(e)}), 500
     except Exception as e:
-        logger.error(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"删除角色失败: {traceback.format_exc()}")
+        return jsonify({"status": 500, "message": "删除角色失败"}), 500
 
 @api_user_bp.route("/getMainCharacter", methods=["GET"])
 @auth_required
@@ -60,9 +64,12 @@ async def get_main_character():
             director = True
         else:
             director = False
-        return jsonify({"mainCharacter": main_character.character_name, "director": director})
+        return jsonify({"status": 200, "mainCharacter": main_character.character_name, "director": director})
+    except KahunaException as e:
+        return jsonify({"status": 500, "message": str(e)}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"获取主角色失败: {traceback.format_exc()}")
+        return jsonify({"status": 500, "message": "获取主角色失败"}), 500
 
 @api_user_bp.route("/setMainCharacter", methods=["POST"])
 @auth_required
@@ -79,10 +86,12 @@ async def set_main_character():
             director = True
         else:
             director = False
-        return jsonify({"message": "主角色设置成功", "director": director})
+        return jsonify({"status": 200, "message": "主角色设置成功", "director": director})
+    except KahunaException as e:
+        return jsonify({"status": 500, "message": str(e)}), 500
     except Exception as e:
-        logger.error(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"设置主角色失败: {traceback.format_exc()}")
+        return jsonify({"status": 500, "message": "设置主角色失败"}), 500
 
 @api_user_bp.route('/isAliasCharacterSettingAvaliable', methods=['GET'])
 @auth_required
@@ -96,14 +105,17 @@ async def is_alias_character_setting_avaliable():
         # 判断用户所在公司是否有绑定总监权限账号
         director_character_id = await CharacterManager().get_director_character_id_of_corporation(main_character.corporation_id)
         if not director_character_id:
-            return jsonify({"isAliasCharacterSettingAvaliable": False})
+            return jsonify({"status": 200, "isAliasCharacterSettingAvaliable": False})
         
         # 否则返回false
         # 有则返回true
 
-        return jsonify({"isAliasCharacterSettingAvaliable": True})
+        return jsonify({"status": 200, "isAliasCharacterSettingAvaliable": True})
+    except KahunaException as e:
+        return jsonify({"status": 500, "message": str(e)}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"检查别名角色设置可用性失败: {traceback.format_exc()}")
+        return jsonify({"status": 500, "message": "检查别名角色设置可用性失败"}), 500
 
 @api_user_bp.route('/getSameTitleAliasCharacterList', methods=['POST'])
 @auth_required
@@ -120,13 +132,19 @@ async def get_same_title_alias_character_list():
         await UserManager().update_same_title_alias_characters(same_title_character_list, main_character_id)
         alias_character_list = await UserManager().get_alias_character_list(main_character_id)
             
-        return jsonify([{
-            "CharacterId": alias_character.alias_character_id,
-            "CharacterName": alias_character.character_name,
-            "Enabled": alias_character.enabled
-        } for alias_character in alias_character_list])
+        return jsonify({
+            "status": 200,
+            "data": [{
+                "CharacterId": alias_character.alias_character_id,
+                "CharacterName": alias_character.character_name,
+                "Enabled": alias_character.enabled
+            } for alias_character in alias_character_list]
+        })
+    except KahunaException as e:
+        return jsonify({"status": 500, "message": str(e)}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"获取同title别名角色列表失败: {traceback.format_exc()}")
+        return jsonify({"status": 500, "message": "获取同title别名角色列表失败"}), 500
 
 @api_user_bp.route('/getAliasCharacterList', methods=['GET'])
 @auth_required
@@ -135,13 +153,19 @@ async def get_alias_character_list():
     main_character_id = await UserManager().get_main_character_id(user_id)
     try:
         alias_character_list = await UserManager().get_alias_character_list(main_character_id)
-        return jsonify([{
-            "CharacterId": alias_character.alias_character_id,
-            "CharacterName": alias_character.character_name,
-            "Enabled": alias_character.enabled
-        } for alias_character in alias_character_list])
+        return jsonify({
+            "status": 200,
+            "data": [{
+                "CharacterId": alias_character.alias_character_id,
+                "CharacterName": alias_character.character_name,
+                "Enabled": alias_character.enabled
+            } for alias_character in alias_character_list]
+        })
+    except KahunaException as e:
+        return jsonify({"status": 500, "message": str(e)}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"获取别名角色列表失败: {traceback.format_exc()}")
+        return jsonify({"status": 500, "message": "获取别名角色列表失败"}), 500
 
 @api_user_bp.route('/searchCharacter', methods=['POST'])
 @auth_required
@@ -154,7 +178,7 @@ async def search_character():
         input_value = data.get("inputValue", "").strip()
         
         if not input_value:
-            return jsonify({"error": "请输入搜索值"}), 400
+            return jsonify({"status": 400, "message": "请输入搜索值"}), 400
         
         from src_v2.model.EVE.eveesi.esi_api.character import characters_character
         from src_v2.core.database.kahuna_database_utils_v2 import EvePublicCharacterInfoDBUtils
@@ -172,28 +196,38 @@ async def search_character():
                         "CharacterName": character_info.get("name", "")
                     })
             except ValueError:
-                return jsonify({"error": "角色ID必须是数字"}), 400
+                return jsonify({"status": 400, "message": "角色ID必须是数字"}), 400
+            except KahunaException as e:
+                return jsonify({"status": 500, "message": str(e)}), 500
             except Exception as e:
                 logger.error(f"搜索角色失败: {traceback.format_exc()}")
-                return jsonify({"error": f"搜索失败: {str(e)}"}), 500
+                return jsonify({"status": 500, "message": "搜索角色失败"}), 500
         else:  # characterName
-            main_character_id = await UserManager().get_main_character_id(user_id)
-            main_character = await CharacterManager().get_character_by_character_id(main_character_id)
-            search_result = await eveesi.search(main_character.ac_token, main_character.character_id, ["character"], input_value)
-            if search_result:
-                character_id_list = search_result.get("character", [])
-                for character_id in character_id_list:
-                    character_info = await characters_character(character_id)
-                    if character_info:
-                        result.append({
-                            "CharacterId": character_info.get("character_id", character_id),
-                            "CharacterName": character_info.get("name", "")
-                        })
+            try:
+                main_character_id = await UserManager().get_main_character_id(user_id)
+                main_character = await CharacterManager().get_character_by_character_id(main_character_id)
+                search_result = await eveesi.search(main_character.ac_token, main_character.character_id, ["character"], input_value)
+                if search_result:
+                    character_id_list = search_result.get("character", [])
+                    for character_id in character_id_list:
+                        character_info = await characters_character(character_id)
+                        if character_info:
+                            result.append({
+                                "CharacterId": character_info.get("character_id", character_id),
+                                "CharacterName": character_info.get("name", "")
+                            })
+            except KahunaException as e:
+                return jsonify({"status": 500, "message": str(e)}), 500
+            except Exception as e:
+                logger.error(f"搜索角色失败: {traceback.format_exc()}")
+                return jsonify({"status": 500, "message": "搜索角色失败"}), 500
         
-        return jsonify(result)
+        return jsonify({"status": 200, "data": result})
+    except KahunaException as e:
+        return jsonify({"status": 500, "message": str(e)}), 500
     except Exception as e:
-        logger.error(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"搜索角色失败: {traceback.format_exc()}")
+        return jsonify({"status": 500, "message": "搜索角色失败"}), 500
 
 @api_user_bp.route('/addAliasCharacters', methods=['POST'])
 @auth_required
@@ -205,7 +239,7 @@ async def add_alias_characters():
         character_ids = data.get("characterIds", [])  # 角色ID列表
         
         if not character_ids:
-            return jsonify({"error": "请至少选择一个角色"}), 400
+            return jsonify({"status": 400, "message": "请至少选择一个角色"}), 400
         
         main_character_id = await UserManager().get_main_character_id(user_id)
         
@@ -237,6 +271,9 @@ async def add_alias_characters():
                     enabled=False
                 ))
                 added_count += 1
+            except KahunaException as e:
+                logger.error(f"添加角色 {character_id} 失败: {str(e)}")
+                failed_list.append(str(character_id))
             except Exception as e:
                 logger.error(f"添加角色 {character_id} 失败: {traceback.format_exc()}")
                 failed_list.append(str(character_id))
@@ -245,6 +282,7 @@ async def add_alias_characters():
         alias_character_list = await UserManager().get_alias_character_list(main_character_id)
         
         return jsonify({
+            "status": 200,
             "message": f"成功添加 {added_count} 个角色",
             "failedList": failed_list,
             "aliasCharacterList": [{
@@ -253,9 +291,11 @@ async def add_alias_characters():
                 "Enabled": alias_character.enabled
             } for alias_character in alias_character_list]
         })
+    except KahunaException as e:
+        return jsonify({"status": 500, "message": str(e)}), 500
     except Exception as e:
-        logger.error(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"添加别名角色失败: {traceback.format_exc()}")
+        return jsonify({"status": 500, "message": "添加别名角色失败"}), 500
 
 @api_user_bp.route('/saveAliasCharacters', methods=['POST'])
 @auth_required
@@ -269,7 +309,9 @@ async def save_alias_characters():
                 continue
             alias_character_obj.enabled = alias_character["Enabled"]
             await EveAliasCharacterDBUtils.save_obj(alias_character_obj)
-        return jsonify({"message": "保存成功"})
+        return jsonify({"status": 200, "message": "保存成功"})
+    except KahunaException as e:
+        return jsonify({"status": 500, "message": str(e)}), 500
     except Exception as e:
-        logger.error(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"保存别名角色失败: {traceback.format_exc()}")
+        return jsonify({"status": 500, "message": "保存别名角色失败"}), 500

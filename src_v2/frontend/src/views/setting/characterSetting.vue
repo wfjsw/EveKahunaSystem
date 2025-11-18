@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { http } from '@/http'
+import { handleApiResponse } from '@/utils/apiResponse'
 
 interface Character {
   name: string
@@ -106,9 +107,13 @@ const isCorpDirector = ref(false)
 const getCharacterList = async () => {
   try {
     const response = await http.get('/user/list')
-    const data = await response.json()
-    // 后端返回的数据结构是 {data: [...]}，需要取 data 字段
-    const list = Array.isArray(data?.data) ? data.data : (data || [])
+    const data = await handleApiResponse(response, '获取角色列表失败')
+    if (!data) {
+      characterList.value = [{ name: '', expiresDate: '', corpName: '' }]
+      return
+    }
+    // 后端返回的数据结构是 {status: 200, data: [...]}，需要取 data 字段
+    const list = Array.isArray(data?.data) ? data.data : []
     // 在列表开头添加一个空选项
     characterList.value = [{ name: '', expiresDate: '', corpName: '' }, ...list]
   } catch (error: any) {
@@ -135,11 +140,10 @@ const handleDelete = async (character: Character) => {
     const response = await http.post(`/user/deleteCharacter`, {
       characterName: character.name
     })
-    ElMessage.success('删除成功')
-    if (response.ok) {
+    const data = await handleApiResponse(response, '删除角色失败')
+    if (data) {
+      ElMessage.success(data.message || '删除成功')
       getCharacterList()
-    } else {
-      ElMessage.error('删除失败')
     }
   } catch (error: any) {
     ElMessage.error(error?.message || '删除失败')
@@ -157,47 +161,66 @@ const handleSetMainCharacter = async () => {
     const response = await http.post(`/user/setMainCharacter`, {
       characterName: characterName
     })
-    const data = await response.json()
-    if (response.ok) {
-      ElMessage.success('主角色设置成功')
+    const data = await handleApiResponse(response, '设置主角色失败')
+    if (data) {
+      ElMessage.success(data.message || '主角色设置成功')
       getCharacterList()
       getIsAliasCharacterSettingAvaliable()
       isCorpDirector.value = data?.director || false
     } else {
-      ElMessage.error('主角色设置失败')
       mainCharacter.value = ''
     }
-    getCharacterList()
   } catch (error: any) {
     ElMessage.error(error?.message || '主角色设置失败')
   }
 }
 
 const getMainCharacter = async () => {
-  const response = await http.get('/user/getMainCharacter')
-  const data = await response.json()
-  mainCharacter.value = data?.mainCharacter || ''
-  isCorpDirector.value = data?.director || false
+  try {
+    const response = await http.get('/user/getMainCharacter')
+    const data = await handleApiResponse(response, '获取主角色失败')
+    if (data) {
+      mainCharacter.value = data?.mainCharacter || ''
+      isCorpDirector.value = data?.director || false
+    }
+  } catch (error: any) {
+    console.error('获取主角色失败:', error)
+  }
 }
 
 const aliasCharacterSettingAvaliable = ref(false)
 const getIsAliasCharacterSettingAvaliable = async () => {
-  const response = await http.get('/user/isAliasCharacterSettingAvaliable')
-  const data = await response.json()
-  aliasCharacterSettingAvaliable.value = data?.isAliasCharacterSettingAvaliable || false
+  try {
+    const response = await http.get('/user/isAliasCharacterSettingAvaliable')
+    const data = await handleApiResponse(response, '检查别名角色设置可用性失败')
+    if (data) {
+      aliasCharacterSettingAvaliable.value = data?.isAliasCharacterSettingAvaliable || false
+    }
+  } catch (error: any) {
+    console.error('检查别名角色设置可用性失败:', error)
+  }
 }
 
 const aliasCharacterList = ref<{ CharacterId: number, CharacterName: string, Enabled: boolean }[]>([])
 let aliasCharacterListEnabled = ref<number[]>([])
 const getAliasCharacterList = async () => {
-  const response = await http.get('/user/getAliasCharacterList')
-  const data = await response.json()
-  for (const item of data) {
-    if (item.Enabled) {
-      aliasCharacterListEnabled.value.push(item.CharacterId)
+  try {
+    const response = await http.get('/user/getAliasCharacterList')
+    const data = await handleApiResponse(response, '获取别名角色列表失败')
+    if (data) {
+      const list = Array.isArray(data?.data) ? data.data : []
+      aliasCharacterListEnabled.value = []
+      for (const item of list) {
+        if (item.Enabled) {
+          aliasCharacterListEnabled.value.push(item.CharacterId)
+        }
+      }
+      aliasCharacterList.value = list
     }
+  } catch (error: any) {
+    console.error('获取别名角色列表失败:', error)
+    aliasCharacterList.value = []
   }
-  aliasCharacterList.value = data || []
 }
 
 const getSameTitleAliasCharacterListLoading = ref(false)
@@ -207,11 +230,26 @@ const getSameTitleAliasCharacterList = async () => {
     return
   }
   getSameTitleAliasCharacterListLoading.value = true
-  await new Promise(resolve => setTimeout(resolve, 10000))
-  const response = await http.post('/user/getSameTitleAliasCharacterList')
-  const data = await response.json()
-  aliasCharacterList.value = data || []
-  getSameTitleAliasCharacterListLoading.value = false
+  try {
+    await new Promise(resolve => setTimeout(resolve, 10000))
+    const response = await http.post('/user/getSameTitleAliasCharacterList')
+    const data = await handleApiResponse(response, '获取同title别名角色列表失败')
+    if (data) {
+      const list = Array.isArray(data?.data) ? data.data : []
+      aliasCharacterList.value = list
+      // 更新启用状态
+      aliasCharacterListEnabled.value = []
+      for (const item of list) {
+        if (item.Enabled) {
+          aliasCharacterListEnabled.value.push(item.CharacterId)
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error('获取同title别名角色列表失败:', error)
+  } finally {
+    getSameTitleAliasCharacterListLoading.value = false
+  }
 }
 
 const addNewCharacterProcess = ref(false)
@@ -253,22 +291,15 @@ const searchCharacters = async () => {
       inputType: addSingleNewCharacterForm.inputType,
       inputValue: addSingleNewCharacterForm.inputValue.trim()
     })
-    
-    if (response.ok) {
-      const data = await response.json()
-      if (Array.isArray(data)) {
-        searchResults.value = data
-        selectedCharacterIds.value = [] // 清空之前的选择
-        if (data.length === 0) {
-          ElMessage.info('未找到匹配的角色')
-        }
-      } else if (data.error) {
-        ElMessage.error(data.error)
-        searchResults.value = []
+    const data = await handleApiResponse(response, '搜索角色失败')
+    if (data) {
+      const list = Array.isArray(data?.data) ? data.data : []
+      searchResults.value = list
+      selectedCharacterIds.value = [] // 清空之前的选择
+      if (list.length === 0) {
+        ElMessage.info('未找到匹配的角色')
       }
     } else {
-      const errorData = await response.json().catch(() => ({ error: '搜索失败' }))
-      ElMessage.error(errorData.error || '搜索失败')
       searchResults.value = []
     }
   } catch (error: any) {
@@ -290,12 +321,18 @@ const addSelectedCharacters = async () => {
     const response = await http.post('/user/addAliasCharacters', {
       characterIds: selectedCharacterIds.value
     })
-    
-    if (response.ok) {
-      const data = await response.json()
+    const data = await handleApiResponse(response, '添加别名角色失败')
+    if (data) {
       ElMessage.success(data.message || '添加成功')
       if (data.aliasCharacterList) {
         aliasCharacterList.value = data.aliasCharacterList
+        // 更新启用状态
+        aliasCharacterListEnabled.value = []
+        for (const item of data.aliasCharacterList) {
+          if (item.Enabled) {
+            aliasCharacterListEnabled.value.push(item.CharacterId)
+          }
+        }
       }
       // 关闭对话框并重置
       addNewCharacterProcess.value = false
@@ -304,9 +341,6 @@ const addSelectedCharacters = async () => {
       addSingleNewCharacterForm.inputValue = ''
       // 刷新别名角色列表
       await getAliasCharacterList()
-    } else {
-      const errorData = await response.json().catch(() => ({ error: '添加失败' }))
-      ElMessage.error(errorData.error || '添加失败')
     }
   } catch (error: any) {
     ElMessage.error(error?.message || '添加失败')
@@ -320,7 +354,7 @@ const handleSelectionChange = (selection: any[]) => {
 }
 
 const handleSaveAliasCharacters = async () => {
-  // TODO: 实现保存别名角色启用状态的功能
+  // 更新别名角色的启用状态
   for (const item of aliasCharacterList.value) {
     item.Enabled = aliasCharacterListEnabled.value.includes(item.CharacterId)
   }
@@ -328,10 +362,9 @@ const handleSaveAliasCharacters = async () => {
     const response = await http.post('/user/saveAliasCharacters', {
       aliasCharacterList: aliasCharacterList.value
     })
-    if (response.ok) {
-      ElMessage.success('保存成功')
-    } else {
-      ElMessage.error('保存失败')
+    const data = await handleApiResponse(response, '保存别名角色失败')
+    if (data) {
+      ElMessage.success(data.message || '保存成功')
     }
   } catch (error: any) {
     ElMessage.error(error?.message || '保存失败')

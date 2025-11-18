@@ -33,7 +33,7 @@ is_running() {
     fi
 }
 
-# 启动服务器
+# 启动服务器（生产模式）
 start_server() {
     # 检查是否已经运行
     if is_running; then
@@ -48,10 +48,58 @@ start_server() {
         exit 1
     fi
 
-    echo "正在启动服务器..."
+    echo "正在启动服务器（生产模式）..."
+    
+    # 设置生产环境变量
+    export ENVIRONMENT=production
+    export POSTGRE_FORCE_REBUILD=false
     
     # 使用 nohup 启动服务器，重定向输出到日志文件
     nohup $PYTHON_CMD "$SERVER_SCRIPT" --prod > "$LOG_FILE" 2>&1 &
+    
+    # 获取后台进程的 PID
+    SERVER_PID=$!
+    
+    # 等待一下，检查进程是否成功启动
+    sleep 2
+    
+    if kill -0 "$SERVER_PID" 2>/dev/null; then
+        # 进程运行正常，保存 PID
+        echo "$SERVER_PID" > "$PID_FILE"
+        echo "服务器启动成功 (PID: $SERVER_PID)"
+        echo "日志文件: $LOG_FILE"
+        echo "使用 'tail -f $LOG_FILE' 查看日志"
+    else
+        echo "错误: 服务器启动失败"
+        echo "请查看日志文件: $LOG_FILE"
+        exit 1
+    fi
+}
+
+# 启动服务器（开发模式）
+start_dev_server() {
+    # 检查是否已经运行
+    if is_running; then
+        PID=$(cat "$PID_FILE")
+        echo "服务器已经在运行中 (PID: $PID)"
+        exit 1
+    fi
+
+    # 检查 Python 脚本是否存在
+    if [ ! -f "$SERVER_SCRIPT" ]; then
+        echo "错误: 找不到 $SERVER_SCRIPT"
+        exit 1
+    fi
+
+    echo "正在启动服务器（开发模式）..."
+    
+    # 设置开发环境变量
+    export ENVIRONMENT=dev
+    export POSTGRE_FORCE_REBUILD=true
+    export POSTGRE_FK_SKIP_VALIDATION=true
+    
+    # 使用 nohup 启动服务器，重定向输出到日志文件
+    nohup $PYTHON_CMD "$SERVER_SCRIPT" --dev > "$LOG_FILE" 2>&1 &
     
     # 获取后台进程的 PID
     SERVER_PID=$!
@@ -115,11 +163,16 @@ stop_server() {
 
 # 显示使用说明
 show_usage() {
-    echo "用法: $0 {start|stop}"
+    echo "用法: $0 {start|dev|stop}"
     echo ""
     echo "命令:"
     echo "  start  - 启动服务器（生产模式）"
+    echo "  dev    - 启动服务器（开发模式）"
     echo "  stop   - 停止服务器"
+    echo ""
+    echo "环境变量:"
+    echo "  生产模式: ENVIRONMENT=production, POSTGRE_FORCE_REBUILD=false"
+    echo "  开发模式: ENVIRONMENT=dev, POSTGRE_FORCE_REBUILD=true, POSTGRE_FK_SKIP_VALIDATION=true"
     echo ""
     echo "文件位置:"
     echo "  PID 文件: $PID_FILE"
@@ -130,6 +183,9 @@ show_usage() {
 case "$1" in
     start)
         start_server
+        ;;
+    dev)
+        start_dev_server
         ;;
     stop)
         stop_server
