@@ -427,7 +427,7 @@ const formatAccounting = (value: number | string | null | undefined): string => 
 }
 
 const CompleteRowClassName = (data: { row: any, rowIndex: number }) => {
-    return data.row.real_quantity == 0 ? 'complete-job' : 'full'
+    return data.row.real_quantity <= 0 ? 'complete-job' : 'full'
 }
 
 const showFake = ref(false)
