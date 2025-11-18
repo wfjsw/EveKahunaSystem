@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # 服务器管理脚本
 # 用于启动和停止 kahunabot 服务器

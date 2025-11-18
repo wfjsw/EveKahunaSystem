@@ -413,7 +413,7 @@ onUnmounted(() => {
 // 会计格式格式化函数
 const formatAccounting = (value: number | string | null | undefined): string => {
     if (value === null || value === undefined || value === '') {
-        return '0'
+        return ''
     }
     const num = typeof value === 'string' ? parseFloat(value) : value
     if (isNaN(num)) {
@@ -426,16 +426,17 @@ const formatAccounting = (value: number | string | null | undefined): string => 
     })
 }
 
-const lackRowClassName = (data: { row: any, rowIndex: number }) => {
-    return data.row.real_quantity > 0 ? 'lack-row' : 'full'
+const CompleteRowClassName = (data: { row: any, rowIndex: number }) => {
+    return data.row.real_quantity == 0 ? 'complete-job' : 'full'
 }
 
 const showFake = ref(false)
 const showUnavailable = ref(false)
+const activeIdFilter = ref('all')
 const workFlowTableView = computed(() => {
     // 使用嵌套对象进行分组：type_id -> fake -> runs
     const grouped: Record<string, Record<string, Record<string, number>>> = {}
-    const typeInfo: Record<string, { type_name: string, type_name_zh: string, avaliable: boolean }> = {}
+    const typeInfo: Record<string, { type_name: string, type_name_zh: string, avaliable: boolean, active_id: number }> = {}
     
     // 遍历数据，进行分组统计
     PlanCalculateWorkFlowTableView.value.forEach((work: any) => {
@@ -449,7 +450,8 @@ const workFlowTableView = computed(() => {
             typeInfo[typeId] = {
                 type_name: work.type_name || '',
                 type_name_zh: work.type_name_zh || '',
-                avaliable: work.avaliable
+                avaliable: work.avaliable,
+                active_id: work.active_id
             }
         }
         
@@ -479,7 +481,7 @@ const workFlowTableView = computed(() => {
             Object.keys(grouped[typeId][fakeKey]).forEach(runsStr => {
                 const runs = parseInt(runsStr)
                 const runsCount = grouped[typeId][fakeKey][runsStr]
-                if ((showFake.value && !fake) || (showUnavailable.value && !info.avaliable)) {
+                if ((showFake.value && !fake) || (showUnavailable.value && !info.avaliable) || (activeIdFilter.value !== 'all' && info.active_id !== parseInt(activeIdFilter.value))) {
                     return
                 }
                 result.push({
@@ -487,6 +489,7 @@ const workFlowTableView = computed(() => {
                     type_name: info.type_name,
                     type_name_zh: info.type_name_zh,
                     avaliable: info.avaliable,
+                    active_id: info.active_id,
                     fake: fake,
                     runs: runs,
                     runs_count: runsCount
@@ -656,7 +659,7 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
                     border
                     max-height="75vh"
                     show-overflow-tooltip
-                    :row-class-name="lackRowClassName"
+                    :row-class-name="CompleteRowClassName"
                 >
                     <el-table-column label="层" prop="layer_id" width="60"/>
                     <el-table-column label="物品id" prop="type_id" width="70"/>
@@ -716,7 +719,7 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
                     border
                     max-height="75vh"
                     show-overflow-tooltip
-                    :row-class-name="lackRowClassName"
+                    :row-class-name="CompleteRowClassName"
                 >
                     <el-table-column label="类型" prop="layer_id" />
                     <el-table-column label="物品id" prop="type_id" />
@@ -780,8 +783,24 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
                             </div>
                         </template>
                     </el-table-column>
+                    <el-table-column label="活动id" width="100">
+                        <template #header>
+                            <span>工作类型</span>
+                            <el-select v-model="activeIdFilter">
+                                <el-option value="all">所有</el-option>
+                                <el-option value="1" label="制造">制造</el-option>
+                                <el-option value="11" label="反应">反应</el-option>
+                            </el-select>
+                        </template>
+                        <template #default="{ row }">
+                            <span v-if="row.active_id === 1">制造</span>
+                            <span v-else-if="row.active_id === 11">反应</span>
+                            <span v-else>未知</span>
+                        </template>
+                    </el-table-column>
                     <el-table-column label="材料满足" prop="avaliable" width="150">
                         <template #header>
+                            <span>材料满足筛选</span>
                             <el-switch
                                 v-model="showUnavailable"
                                 inline-prompt
@@ -790,20 +809,28 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
                             />
                         </template>
                         <template #default="{ row }">
-                            {{ row.avaliable ? '是' : '否' }}
+                            <div style="display: flex; align-items: center; justify-content: center;">
+                            <el-icon v-if="row.avaliable" size="20" style="color: #67c23a;"><CircleCheckFilled /></el-icon>
+                            <el-icon v-else size="20" style="color: #f56c6c;"><CircleCloseFilled /></el-icon>
+                            <!-- {{ row.avaliable ? '是' : '否' }} -->
+                            </div>
                         </template>
                     </el-table-column>
                     <el-table-column label="分配蓝图" prop="fake" width="150">
                         <template #header>
+                            <span>蓝图缺失筛选</span>
                             <el-switch
                                 v-model="showFake"
                                 inline-prompt
                                 active-text="蓝图缺失"
-                                inactive-text="显示所有工作"
+                                inactive-text="显示所有"
                             />
                         </template>
                         <template #default="{ row }">
-                            {{ row.fake ? '是' : '否' }}
+                            <div style="display: flex; align-items: center; justify-content: center;">
+                            <el-icon v-if="row.fake" size="20" style="color: #67c23a;"><CircleCloseFilled /></el-icon>
+                            <el-icon v-else size="20" style="color: #f56c6c;"><CircleCheckFilled /></el-icon>
+                            </div>
                         </template>
                     </el-table-column>
                     <el-table-column label="Runs" prop="runs" width="100" :formatter="(row: any, column: any, cellValue: any) => formatAccounting(cellValue)">
@@ -855,8 +882,8 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
 </template>
 
 <style scoped>
-:deep(.el-table .lack-row) {
-    background-color: #ff7979 !important;
+:deep(.el-table .complete-job) {
+    background-color: #e7ffc8 !important;
     font-weight: bold !important;
     color: #000000 !important;
 }

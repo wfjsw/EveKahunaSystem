@@ -440,6 +440,7 @@ class IndustryManager(metaclass=SingletonMeta):
             # 整理工作流输出
             work_flow.extend([{
                     "type_id": work["type_id"],
+                    "active_id": await BPM.get_activity_id_by_product_typeid(work["type_id"]),
                     "type_name_zh": SdeUtils.get_cn_name_by_id(work["type_id"]),
                     "type_name": SdeUtils.get_name_by_id(work["type_id"]),
                     "avaliable": work["avaliable"],
@@ -452,7 +453,7 @@ class IndustryManager(metaclass=SingletonMeta):
             # 整理蓝图库存
             await rdm.r.hset(op.current_progress_key, mapping={"name": "整理蓝图库存", "progress": 50, "is_indeterminate": 1})
             node['bp_quantity'], node['bp_jobs'] = await op.get_bp_status(node['type_id'])
-        
+        await tqdm_manager.complete_mission(f"分类节点 {plan_name}")
         # for marterial_type, material_nodes in material_output.items():
         #     for material_node in material_nodes:
         #         material_node.update({
