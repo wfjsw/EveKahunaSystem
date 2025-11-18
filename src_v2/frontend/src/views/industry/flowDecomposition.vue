@@ -438,8 +438,8 @@ const showFake = ref(false)
 const showUnavailable = ref(false)
 const activeIdFilter = ref('all')
 const workFlowTableView = computed(() => {
-    // 使用嵌套对象进行分组：type_id -> fake -> runs
-    const grouped: Record<string, Record<string, Record<string, number>>> = {}
+    // 使用嵌套对象进行分组：type_id -> fake -> avaliable -> runs
+    const grouped: Record<string, Record<string, Record<string, Record<string, number>>>> = {}
     const typeInfo: Record<string, { type_name: string, type_name_zh: string, avaliable: boolean, active_id: number }> = {}
     
     // 遍历数据，进行分组统计
@@ -447,8 +447,13 @@ const workFlowTableView = computed(() => {
         const typeId = String(work.type_id)
         const fake = work.bp_object?.fake ?? false
         const fakeKey = String(fake)
+        const avaliable = work.avaliable ?? false
+        const avaliableKey = String(avaliable)
         const runs = work.runs
         
+        if (work.type_id === 11548) {
+            console.log(work)
+        }
         // 保存 type 信息
         if (!(typeId in typeInfo)) {
             typeInfo[typeId] = {
@@ -466,13 +471,16 @@ const workFlowTableView = computed(() => {
         if (!(fakeKey in grouped[typeId])) {
             grouped[typeId][fakeKey] = {}
         }
+        if (!(avaliableKey in grouped[typeId][fakeKey])) {
+            grouped[typeId][fakeKey][avaliableKey] = {}
+        }
         const runsKey = String(runs)
-        if (!(runsKey in grouped[typeId][fakeKey])) {
-            grouped[typeId][fakeKey][runsKey] = 0
+        if (!(runsKey in grouped[typeId][fakeKey][avaliableKey])) {
+            grouped[typeId][fakeKey][avaliableKey][runsKey] = 0
         }
         
         // 统计计数
-        grouped[typeId][fakeKey][runsKey]++
+        grouped[typeId][fakeKey][avaliableKey][runsKey]++
     })
     
     // 扁平化为数组
@@ -482,21 +490,24 @@ const workFlowTableView = computed(() => {
         const info = typeInfo[typeId]
         Object.keys(grouped[typeId]).forEach(fakeKey => {
             const fake = fakeKey === 'true'
-            Object.keys(grouped[typeId][fakeKey]).forEach(runsStr => {
-                const runs = parseInt(runsStr)
-                const runsCount = grouped[typeId][fakeKey][runsStr]
-                if ((showFake.value && !fake) || (showUnavailable.value && !info.avaliable) || (activeIdFilter.value !== 'all' && info.active_id !== parseInt(activeIdFilter.value))) {
-                    return
-                }
-                result.push({
-                    type_id: typeIdNum,
-                    type_name: info.type_name,
-                    type_name_zh: info.type_name_zh,
-                    avaliable: info.avaliable,
-                    active_id: info.active_id,
-                    fake: fake,
-                    runs: runs,
-                    runs_count: runsCount
+            Object.keys(grouped[typeId][fakeKey]).forEach(avaliableKey => {
+                const avaliable = avaliableKey === 'true'
+                Object.keys(grouped[typeId][fakeKey][avaliableKey]).forEach(runsStr => {
+                    const runs = parseInt(runsStr)
+                    const runsCount = grouped[typeId][fakeKey][avaliableKey][runsStr]
+                    if ((showFake.value && !fake) || (showUnavailable.value && !avaliable) || (activeIdFilter.value !== 'all' && info.active_id !== parseInt(activeIdFilter.value))) {
+                        return
+                    }
+                    result.push({
+                        type_id: typeIdNum,
+                        type_name: info.type_name,
+                        type_name_zh: info.type_name_zh,
+                        avaliable: avaliable,
+                        active_id: info.active_id,
+                        fake: fake,
+                        runs: runs,
+                        runs_count: runsCount
+                    })
                 })
             })
         })
@@ -810,6 +821,28 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
                             </div>
                         </template>
                     </el-table-column>
+                    <el-table-column label="流程" prop="runs" width="100" :formatter="(row: any, column: any, cellValue: any) => formatAccounting(cellValue)">
+                        <template #default="{ row }">
+                            <div 
+                                class="copyable-cell" 
+                                @click="copyCellContent(row.runs, 'Runs')"
+                                :title="`点击复制: ${row.runs || ''}`"
+                            >
+                                {{ formatAccounting(row.runs) }}
+                            </div>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="线" prop="runs_count" width="120" :formatter="(row: any, column: any, cellValue: any) => formatAccounting(cellValue)">
+                        <template #default="{ row }">
+                            <div 
+                                class="copyable-cell" 
+                                @click="copyCellContent(row.runs_count, 'Runs Count')"
+                                :title="`点击复制: ${row.runs_count || ''}`"
+                            >
+                                {{ formatAccounting(row.runs_count) }}
+                            </div>
+                        </template>
+                    </el-table-column>
                     <el-table-column label="活动id" width="100">
                         <template #header>
                             <span>工作类型</span>
@@ -857,28 +890,6 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
                             <div style="display: flex; align-items: center; justify-content: center;">
                             <el-icon v-if="row.fake" size="20" style="color: #f56c6c;"><CircleCloseFilled /></el-icon>
                             <el-icon v-else size="20" style="color: #67c23a;"><CircleCheckFilled /></el-icon>
-                            </div>
-                        </template>
-                    </el-table-column>
-                    <el-table-column label="Runs" prop="runs" width="100" :formatter="(row: any, column: any, cellValue: any) => formatAccounting(cellValue)">
-                        <template #default="{ row }">
-                            <div 
-                                class="copyable-cell" 
-                                @click="copyCellContent(row.runs, 'Runs')"
-                                :title="`点击复制: ${row.runs || ''}`"
-                            >
-                                {{ formatAccounting(row.runs) }}
-                            </div>
-                        </template>
-                    </el-table-column>
-                    <el-table-column label="Runs Count" prop="runs_count" width="120" :formatter="(row: any, column: any, cellValue: any) => formatAccounting(cellValue)">
-                        <template #default="{ row }">
-                            <div 
-                                class="copyable-cell" 
-                                @click="copyCellContent(row.runs_count, 'Runs Count')"
-                                :title="`点击复制: ${row.runs_count || ''}`"
-                            >
-                                {{ formatAccounting(row.runs_count) }}
                             </div>
                         </template>
                     </el-table-column>

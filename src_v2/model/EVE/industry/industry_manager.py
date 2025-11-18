@@ -326,6 +326,7 @@ class IndustryManager(metaclass=SingletonMeta):
         
         relations = await NIU.get_user_plan_relation(user_name, plan_name)
         await tqdm_manager.add_mission(f"收集关系数据 {plan_name}", len(relations))
+        await rdm.r.hset(op.current_progress_key, mapping={"name": "收集关系数据", "progress": 0, "is_indeterminate": 1})
         last_progress = 0
         eiv_cost_dict = {}
         for relation in relations:
@@ -379,6 +380,7 @@ class IndustryManager(metaclass=SingletonMeta):
                         "real_jobs": node_dict[product_id].get('real_jobs', 0) + sum(work['runs'] for work in real_job_list),
                         "real_job_list": node_dict[product_id].get('real_job_list', []) + real_job_list,
                     })
+        await tqdm_manager.complete_mission(f"收集关系数据 {plan_name}")
 
         # 获取库存和冗余
         logger.info("获取库存和冗余")
