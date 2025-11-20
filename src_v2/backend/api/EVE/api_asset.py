@@ -3,6 +3,7 @@ import traceback
 from quart import Blueprint, jsonify, request, g
 from src_v2.backend.auth import auth_required
 from src_v2.backend.api.permission_required import permission_required
+from src_v2.backend.api.permission_required import role_required
 from src_v2.core.permission.permission_manager import permission_manager, rdm
 from src_v2.model.EVE.character.character_manager import CharacterManager
 from src_v2.model.EVE.character.character import Character
@@ -100,6 +101,7 @@ async def edit_personal_asset_setting():
 
 @api_EVE_asset_bp.route('/pullAssetOwners', methods=['GET'])
 @auth_required
+@role_required(["vip_alpha"], 402, "仅ALPHA订阅者可使用资产功能。")
 async def get_pull_asset_owners():
     try:
         user_id = g.current_user["user_id"]
@@ -153,6 +155,7 @@ async def create_asset_pull_mission():
 
 @api_EVE_asset_bp.route('/getAssetPullMissions', methods=['GET'])
 @auth_required
+@role_required(["vip_alpha"], 402, "仅ALPHA订阅者可拉取真实资产建筑。虚拟建筑可正常使用。")
 async def get_asset_pull_missions():
     try:
         user_id = g.current_user["user_id"]
@@ -166,6 +169,7 @@ async def get_asset_pull_missions():
 
 @api_EVE_asset_bp.route('/closeAssetPullMission', methods=['POST'])
 @auth_required
+@role_required(["vip_alpha"], 402, "仅ALPHA订阅者可使用资产功能。")
 async def close_asset_pull_mission():
     try:
         data = await request.json
@@ -182,6 +186,7 @@ async def close_asset_pull_mission():
 
 @api_EVE_asset_bp.route('/startAssetPullMission', methods=['POST'])
 @auth_required
+@role_required(["vip_alpha"], 402, "仅ALPHA订阅者可使用资产功能。")
 async def start_asset_pull_mission():
     try:
         data = await request.json
@@ -199,6 +204,7 @@ async def start_asset_pull_mission():
 
 @api_EVE_asset_bp.route('/deleteAssetPullMission', methods=['DELETE'])
 @auth_required
+@role_required(["vip_alpha"], 402, "仅ALPHA订阅者可使用资产功能。")
 async def delete_asset_pull_mission():
     try:
         data = await request.json
@@ -249,6 +255,7 @@ async def start_pull_asset_now(asset_owner_type: str, asset_owner_id: int):
 
 @api_EVE_asset_bp.route('/pullAssetNow', methods=['POST'])
 @auth_required
+@role_required(["vip_alpha"], 402, "仅ALPHA订阅者可使用资产功能。")
 async def pull_asset_now():
     try:
         data = await request.json
@@ -290,6 +297,7 @@ async def pull_asset_now():
 
 @api_EVE_asset_bp.route('/getAssetPullMissionStatus', methods=['POST'])
 @auth_required
+@role_required(["vip_alpha"], 402, "仅ALPHA订阅者可使用资产功能。")
 async def get_asset_pull_mission_status():
     try:
         user_id = g.current_user["user_id"]

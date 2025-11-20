@@ -7,6 +7,20 @@ from src_v2.core.database.kahuna_database_utils_v2 import (
 from src_v2.core.database.neo4j_utils import Neo4jIndustryUtils as NIU
 from src_v2.core.utils import KahunaException
 
+VIRTUAL_STRUCTURE_DICT = {
+    "虚拟-Sotiyo": 1,
+    "虚拟-Tatara": 2,
+    "虚拟-Raitaru": 3,
+    "虚拟-Azbel": 4,
+    "虚拟-Athanor": 5
+}
+VIRTUAL_STRUCTURE_ID_DICT = {
+    1: "虚拟-Sotiyo",
+    2: "虚拟-Tatara",
+    3: "虚拟-Raitaru",
+    4: "虚拟-Azbel",
+    5: "虚拟-Athanor"
+}
 
 async def create_config_flow_config(user_id: str, data):
     """创建配置流配置
@@ -88,10 +102,15 @@ async def get_config_flow_config_list(user_id: str):
             "config_value": config.config_value
         }
         if config.config_type == 'StructureRigConfig':
-            structure_info = await NIU.get_structure_node_by_id(config.config_value['structure_id'])
-            config_data['config_value'].update({
-                "structure_name": structure_info.get('structure_name', None)
-            })
+            if config.config_value['structure_id'] in VIRTUAL_STRUCTURE_ID_DICT:
+                config_data['config_value'].update({
+                    "structure_name": VIRTUAL_STRUCTURE_ID_DICT[config.config_value['structure_id']]
+                })
+            else:
+                structure_info = await NIU.get_structure_node_by_id(config.config_value['structure_id'])
+                config_data['config_value'].update({
+                    "structure_name": structure_info.get('structure_name', None)
+                })
         res_list.append(config_data)
     return res_list
 
@@ -149,8 +168,11 @@ async def get_config_flow_list(user_id: str, plan_name: str):
             "config_value": config.config_value
         })
         if config.config_type == 'StructureRigConfig':
-            structure_info = await NIU.get_structure_node_by_id(config.config_value['structure_id'])
-            config_list[-1]['config_value']['structure_name'] = structure_info.get('structure_name', None)
+            if config.config_value['structure_id'] in VIRTUAL_STRUCTURE_ID_DICT:
+                config_list[-1]['config_value']['structure_name'] = VIRTUAL_STRUCTURE_ID_DICT[config.config_value['structure_id']]
+            else:
+                structure_info = await NIU.get_structure_node_by_id(config.config_value['structure_id'])
+                config_list[-1]['config_value']['structure_name'] = structure_info.get('structure_name', None)
     return config_list
 
 

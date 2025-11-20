@@ -11,6 +11,7 @@ import WorkFlowView from './components/WorkFlowView.vue'
 import MaterialView from './components/MaterialView.vue'
 import FlowView from './components/FlowView.vue'
 import LogisticsView from './components/LogisticsView.vue'
+import { haveRole } from '@/router/guards'
 
 // localStorage key 前缀
 const STORAGE_KEY_PREFIX = 'plan_calculate_result_'
@@ -583,17 +584,17 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
                 />
             </el-tab-pane>
             
-            <el-tab-pane label="成本视图">
+            <el-tab-pane label="成本视图" v-if="haveRole('vip_alpha')">
                 <CostView 
                     :-plan-calculate-e-i-v-cost-table-view="PlanCalculateEIVCostTableView"
                 />
             </el-tab-pane>
             
-            <el-tab-pane label="劳动力视图">
+            <el-tab-pane label="劳动力视图" v-if="haveRole('vip_alpha')">
                 <LaborView :running-jobs="PlanCalculateRunningJobTableView" />
             </el-tab-pane>
 
-            <el-tab-pane label="物流视图">
+            <el-tab-pane label="物流视图" v-if="haveRole('vip_alpha')">
                 <LogisticsView 
                     :logistics-data="PlanCalculateLogisticsTableView"
                     :selected-plan="selectedPlan"

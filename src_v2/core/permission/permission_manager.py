@@ -8,6 +8,7 @@ from ..database.kahuna_database_utils_v2 import (
     UserDBUtils
 )
 from ..database.connect_manager import postgres_manager as dbm, redis_manager as rdm
+from ..log import logger
 from ..database.model import (
     Roles as M_Roles,
     Permissions as M_Permissions,
@@ -21,12 +22,12 @@ class PermissionManager():
     async def create_role(self, role_name, parent_role_id: int = None, role_description: str = None):
         role_obj = await RolesDBUtils.select_role_by_role_name(role_name)
         if role_obj:
-            raise ValueError(f"Role {role_name} already exists")
+            logger.warning(f"Role {role_name} already exists")
         role_obj = M_Roles(
             role_name=role_name,
             role_description=role_description
         )
-        await RolesDBUtils.save_obj(role_obj)
+        await RolesDBUtils.merge(role_obj)
         role_obj = await RolesDBUtils.select_role_by_role_name(role_name)
 
         return role_obj
@@ -258,7 +259,45 @@ class PermissionManager():
             child_roles.append(hierarchy_obj.child_role_name)
         return child_roles
 
+    async def get_all_descendant_roles(self, role_name: str):
+        """递归获取角色的所有子角色（包括子角色的子角色）
+        
+        Args:
+            role_name: 角色名称
+            
+        Returns:
+            list[str]: 所有后代角色的列表
+        """
+        collected = set()
+        
+        async def collect_all_children(role_name: str, collected: set) -> None:
+            """递归收集所有子角色"""
+            if role_name in collected:
+                return  # 避免循环引用
+            
+            collected.add(role_name)
+            
+            # 收集所有子角色
+            async for relationship in await RoleHierarchyDBUtils.select_all_by_parent_role_name(role_name):
+                child_name = relationship.child_role_name
+                if child_name not in collected:
+                    await collect_all_children(child_name, collected)
+        
+        await collect_all_children(role_name, collected)
+        # 移除自身，只返回子角色
+        collected.discard(role_name)
+        return list(collected)
+
     async def delete_role_hierarchys(self, hierarchy_pairs: list[list[str]]):
         await RoleHierarchyDBUtils.delete_hierarchy_by_role_names(hierarchy_pairs)
+
+    async def init_base_roles(self):
+        await self.create_role('admin', role_description='管理员')
+        await self.create_role('user', role_description='用户')
+        await self.create_role('guest', role_description='访客')
+
+        # 会员等级
+        await self.create_role('vip_alpha', role_description='alpha')
+        await self.create_role('vip_omega', role_description='omega')
 
 permission_manager = PermissionManager()

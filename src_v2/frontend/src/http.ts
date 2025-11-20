@@ -97,8 +97,8 @@ class HttpService {
     return new AxiosResponseAdapter(res)
   }
 
-  async get(endpoint: string) {
-    return this.request(endpoint, { method: 'GET' })
+  async get(endpoint: string, data?: any) {
+    return this.request(endpoint, { method: 'GET', body: data !== undefined ? JSON.stringify(data) : undefined })
   }
 
   async post(endpoint: string, data?: any) {

@@ -6,6 +6,7 @@ from quart import current_app as app
 from src_v2.backend.auth import auth_required
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from src_v2.core.permission.permission_manager import PermissionManager
 from src_v2.core.user.user_manager import UserManager
 from src.service.log_server import logger
 from src_v2.model.EVE.character.character_manager import CharacterManager
@@ -44,6 +45,7 @@ async def signup():
 
         pass_hash = generate_password_hash(password)
         user = await UserManager().create_user(user_name=username, passwd_hash=pass_hash)
+        await permission_manager.add_role_to_user(username, 'user')
 
         return jsonify({"status": 200, "message": "注册成功"})
     except KahunaException as e:

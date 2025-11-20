@@ -4,6 +4,7 @@ import { http } from '@/http'
 import IndustryPlanConfigFlowTable from './industryPlanConfigFlowTable.vue'
 import { ElMessage } from 'element-plus'
 import { VueDraggable } from 'vue-draggable-plus'
+import { haveRole } from '@/router/guards'
 
 interface Props {
     selectedPlan: string
@@ -184,17 +185,35 @@ const configForm = ref({
     }
 })
 
+const virtualStructureDict = ref<{ [key: string]: number }>({
+    "虚拟-Sotiyo": 1,
+    "虚拟-Tatara": 2,
+    "虚拟-Raitaru": 3,
+    "虚拟-Azbel": 4,
+    "虚拟-Athanor": 5,
+})
+
+
 const createConfigType = ref('建筑插件')
 const createConfig = async () => {
     let config_value = null
     console.log("createConfigType.value", createConfigType.value)
     if (createConfigType.value === 'StructureRigConfig') {
-        const structure_item = structureSuggestions.value.find(item => item.structure_name === configForm.value.StructureRigConfig.structure_name)
-        if (structure_item) {
+        if (configForm.value.StructureRigConfig.structure_name.includes('虚拟-')) {
             config_value = {
-                structure_id: structure_item.structure_id,
+                structure_id: virtualStructureDict.value[configForm.value.StructureRigConfig.structure_name],
                 time_eff_level: configForm.value.StructureRigConfig.time_eff_level,
                 mater_eff_level: configForm.value.StructureRigConfig.mater_eff_level
+            }
+        }
+        else {
+            const structure_item = structureSuggestions.value.find(item => item.structure_name === configForm.value.StructureRigConfig.structure_name)
+            if (structure_item) {
+                config_value = {
+                    structure_id: structure_item.structure_id,
+                    time_eff_level: configForm.value.StructureRigConfig.time_eff_level,
+                    mater_eff_level: configForm.value.StructureRigConfig.mater_eff_level
+                }
             }
         }
     } else if (createConfigType.value === 'StructureAssignConf') {
@@ -219,6 +238,7 @@ const createConfig = async () => {
         ElMessage.error("未找到对应的配置类型")
         return
     }
+    
     console.log("config_value", config_value)
     const res = await http.post('/EVE/industry/createConfigFlowConfig', {
         config_type: createConfigType.value,
@@ -247,9 +267,18 @@ interface StructureItem {
     structure_name: string
 }
 const structureSuggestions = ref<StructureItem[]>([])
+const structureSuggestionsCache = ref<StructureItem[]>([])
 const fetchStructureSuggestions = async (queryString: string, cb: (suggestions: StructureItem[]) => void) => {
+    if (structureSuggestionsCache.value.length > 0) {
+        cb(structureSuggestionsCache.value)
+        return
+    }
     const res = await http.get('/EVE/industry/getStructureList')
     const data = await res.json()
+    if (data.status !== 200) {
+        ElMessage.error(data.message)
+        data.value = []
+    }
 
     console.log("data", data)
     structureSuggestions.value = data.data
@@ -257,6 +286,12 @@ const fetchStructureSuggestions = async (queryString: string, cb: (suggestions: 
     ? structureSuggestions.value.filter(structureSuggestionsCreateFilter(queryString))
     : []
 
+    results.push(...Object.keys(virtualStructureDict.value).map(item => ({
+        structure_id: virtualStructureDict.value[item],
+        structure_name: item
+    })))
+
+    structureSuggestionsCache.value = results
     console.log("results", results)
     cb(results)
 }
@@ -557,7 +592,7 @@ watch(
             <el-radio-button label="建筑分配" value="StructureAssignConf" />
             <el-radio-button label="原材料标记" value="MaterialTagConf" />
             <el-radio-button label="缺省蓝图参数" value="DefaultBlueprintConf" />
-            <el-radio-button label="载入库存" value="LoadAssetConf" />
+            <el-radio-button label="载入库存" value="LoadAssetConf" :disabled="haveRole('vip_alpha')"/>
             <el-radio-button label="最大作业拆分控制" value="MaxJobSplitCountConf" />
         </el-radio-group>
 

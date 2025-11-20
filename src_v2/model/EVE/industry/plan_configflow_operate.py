@@ -229,7 +229,10 @@ class ConfigFlowOperateCenter():
                     count += job['runs']
         return count
 
-    async def get_running_job_tableview_data(self):
+    async def get_running_job_tableview_data(self, consider_running_job: bool):
+        if not consider_running_job:
+            return []
+
         running_job_list = await self.get_running_job_list()
         access_container_list = []
         for config in self.load_asset_confs:
@@ -400,8 +403,6 @@ class ConfigFlowOperateCenter():
             self._bp_prepare = True
 
     async def get_bp_object(self, type_id: int, less_job_run: bool, considerate_bp_relation: bool):
-        if not self._bp_prepare:
-            await self.prepare_bp_asset()
         bp_type_id = await BPM.get_bp_id_by_prod_typeid(type_id)
         
         fake_bp = {
@@ -418,6 +419,10 @@ class ConfigFlowOperateCenter():
 
         if not considerate_bp_relation:
             return fake_bp
+
+        # 更新bp资产缓存
+        if not self._bp_prepare:
+            await self.prepare_bp_asset()
         # 先用bpc
         bpc_list = self._bp_asset.get(bp_type_id, {}).get("bpc", [])
         bpc_list.sort(key=lambda x: (x["runs"]), reverse=True)
@@ -482,7 +487,13 @@ class ConfigFlowOperateCenter():
 
         return fake_bp
 
-    async def get_bp_status(self, type_id: int):
+    async def get_bp_status(self, type_id: int, consider_bp_relation: bool):
+        if not consider_bp_relation:
+            return 0, {
+                "bpc": 0,
+                "bpo": 0
+            }
+
         if not self._bp_prepare:
             await self.prepare_bp_asset()
         
@@ -561,7 +572,18 @@ class ConfigFlowOperateCenter():
         if res:
             # 获取建筑
             structure_name = conf['structure_name']
-            if structure_name not in self._structure_info:
+            from src_v2.model.EVE.industry.industry_utils.config_utils import VIRTUAL_STRUCTURE_DICT
+            if structure_name in VIRTUAL_STRUCTURE_DICT:
+                structure_info = {
+                    "structure_id": VIRTUAL_STRUCTURE_DICT[structure_name],
+                    "structure_name": structure_name,
+                    "structure_type": "Virtual",
+                    "system_id": 0,
+                    "system_name": "虚拟",
+                    "item_id": VIRTUAL_STRUCTURE_DICT[structure_name],
+                }
+                self._structure_info[structure_name] = structure_info
+            elif structure_name not in self._structure_info:
                 structure_infos = await NAU.get_structure_nodes()
                 for info in structure_infos:
                     if info['structure_name'] == structure_name:
@@ -569,6 +591,7 @@ class ConfigFlowOperateCenter():
                         break
             structure_info = self._structure_info[structure_name]
             
+            # 制造 =======================================================
             if structure_info['structure_type'] == 'Sotiyo':
                 structure_eff['mater_eff'] *= MANU_STRUCTURE_MATER_EFF
                 structure_eff['time_eff'] *= LARGE_STRUCTURE_MANU_TIME_EFF
@@ -578,6 +601,7 @@ class ConfigFlowOperateCenter():
             elif structure_info['structure_type'] == 'Raitaru':
                 structure_eff['mater_eff'] *= MANU_STRUCTURE_MATER_EFF
                 structure_eff['time_eff'] *= SMALL_STRUCTURE_MANU_TIME_EFF
+            # 反应 =======================================================
             elif structure_info['structure_type'] == 'Tatara':
                 structure_eff['mater_eff'] *= 1
                 structure_eff['time_eff'] *= MID_STRUCTURE_REAC_TIME_EFF
@@ -585,17 +609,16 @@ class ConfigFlowOperateCenter():
                 structure_eff['mater_eff'] *= 1
                 structure_eff['time_eff'] *= SMALL_STRUCTURE_REAC_TIME_EFF
             
-            # 建筑插
+            # 建筑插 ======================================================
             for rig_conf in self.structure_rig_confs:
                 if rig_conf['structure_id'] == structure_info['item_id']:
                     bunus = NULL_MANU_SEC_BONUS if active_type == 1 else NULL_REAC_SEC_BONUS
                     structure_rig_eff['mater_eff'] *= (1 - RIG_MATER_EFF[rig_conf['mater_eff_level']] * bunus)
                     structure_rig_eff['time_eff'] *= (1 - RIG_TIME_EFF[rig_conf['time_eff_level']] * bunus)
-            
+        
         # 蓝图这里不负责
 
         # 技能
-        
         if active_type == 1:
             skill_eff['time_eff'] *= MANU_SKILL_TIME_EFF
         elif active_type == 11:
@@ -791,8 +814,8 @@ class ConfigFlowOperateCenter():
         system_cost = await rds.r.hgetall(f"system_cost_cache:{solar_system_id}")
         if not system_cost:
             return {
-                "manufacturing": 0.14,
-                "reaction": 0.14
+                "manufacturing": 0.14 / 100 + 0.04,
+                "reaction": 0.14 / 100 + 0.04
             }
         self._system_cost[solar_system_id] = system_cost
         return system_cost

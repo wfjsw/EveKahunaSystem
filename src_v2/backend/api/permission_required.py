@@ -46,3 +46,32 @@ def permission_required(req_permissions: list[str]):
             return await f(*args, **kwargs)
         return decorated_function
     return decorator
+
+def role_required(req_roles: list[str], res_code = 403, message: str = '权限不足'):
+    def decorator(f):
+        @wraps(f)
+        async def decorated_function(*args, **kwargs):
+            user_id = g.current_user['user_id']
+            # 获取用户直接拥有的角色
+            direct_roles = await permission_manager.get_user_roles(user_id)
+            
+            # 获取所有角色（直接角色 + 所有子角色）
+            all_roles = set(direct_roles)
+            for role in direct_roles:
+                # 递归获取该角色的所有子角色
+                descendant_roles = await permission_manager.get_all_descendant_roles(role)
+                all_roles.update(descendant_roles)
+            
+            # 检查所需的角色是否在扩展后的角色集合中
+            role_access = all(role in all_roles for role in req_roles)
+            logger.info(f"all_roles: {all_roles}")
+            logger.info(f"req_roles: {req_roles}")
+            if not role_access:
+                if "vip_alpha" in req_roles or "vip_omega" in req_roles:
+                    return jsonify({'message': message}), res_code
+                else:
+                    logger.error(f"{f.__name__}: 用户 {user_id} 权限不足，缺少角色 {req_roles}")
+                    return jsonify({'message': message}), res_code
+            return await f(*args, **kwargs)
+        return decorated_function
+    return decorator

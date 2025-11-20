@@ -7,6 +7,7 @@ import json
 from quart import Quart, request, jsonify, g, Blueprint, redirect
 from quart import current_app as app
 from src_v2.backend.auth import auth_required, verify_token
+from src_v2.backend.api.permission_required import role_required
 from src_v2.core.database.connect_manager import redis_manager
 from werkzeug.security import check_password_hash, generate_password_hash
 from sqlalchemy.exc import IntegrityError
@@ -132,12 +133,14 @@ async def _calculate_plan_async(user_id: str, plan_name: str):
         logger.info(f"计划 {plan_name} 计算完成")
     except KahunaException as e:
         # 计算失败，设置状态为失败
+        traceback.print_exc()
         error_msg = str(e)
         await redis_manager.redis.set(status_key, f"failed:{error_msg}")
         await redis_manager.redis.expire(status_key, 3600)
         logger.error(f"计划 {plan_name} 计算失败: {error_msg}")
     except Exception as e:
         # 计算失败，设置状态为失败
+        traceback.print_exc()
         error_msg = f"计算过程发生错误: {str(e)}"
         await redis_manager.redis.set(status_key, f"failed:{error_msg}")
         await redis_manager.redis.expire(status_key, 3600)
@@ -311,6 +314,7 @@ async def delete_industrypermision():
 
 @api_industry_bp.route("/getStructureList", methods=["GET"])
 @auth_required
+@role_required(["vip_alpha"], 402, "仅ALPHA订阅者可拉取真实资产建筑。虚拟建筑可正常使用。")
 async def get_structure_list():
     user_id = g.current_user["user_id"]
     try:

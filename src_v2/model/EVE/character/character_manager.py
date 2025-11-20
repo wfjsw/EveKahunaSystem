@@ -81,7 +81,7 @@ class CharacterManager(metaclass=SingletonMeta):
         if not character_verify_data or 'CharacterID' not in character_verify_data:
             logger.error('No character info found')
             logger.error(character_verify_data)
-            raise KahunaException('No character info found')
+            raise KahunaException('角色认证信息异常')
 
         character_id = character_verify_data['CharacterID']
         character_data = await eveesi.characters_character(character_id)
@@ -94,6 +94,10 @@ class CharacterManager(metaclass=SingletonMeta):
         expires_time = (parse_iso_datetime(character_verify_data["ExpiresOn"])
                         .astimezone(timezone(timedelta(hours=+8), 'Shanghai'))
                         .replace(tzinfo=None))
+
+        character_db_obj = await EveAuthedCharacterDBUtils.select_character_by_character_id(character_id)
+        if character_db_obj:
+            raise KahunaException('角色已被其他用户绑定，共享账号是不对的！')
 
         character_db_obj = M_EveAuthedCharacter(
             character_id=character_id,

@@ -72,11 +72,14 @@ class IndustryManager(metaclass=SingletonMeta):
 
     @classmethod
     async def create_plan(cls, user_name: str, plan_name: str, plan_settings: dict):
+        plan_obj = await EveIndustryPlanDBUtils.select_by_user_name_and_plan_name(user_name, plan_name)
+        if plan_obj:
+            raise KahunaException(f"计划已存在")
         plan_obj = EveIndustryPlanDBUtils.get_obj()
-        plan_obj.plan_name = plan_name
         plan_obj.user_name = user_name
+        plan_obj.plan_name = plan_name
         plan_obj.settings = plan_settings
-        await EveIndustryPlanDBUtils.save_obj(plan_obj)
+        await EveIndustryPlanDBUtils.merge(plan_obj)
 
     @classmethod
     async def modify_plan_settings(cls, user_name: str, plan_name: str, plan_settings: dict):
@@ -426,7 +429,7 @@ class IndustryManager(metaclass=SingletonMeta):
 
             # 整理蓝图库存
             await rdm.r.hset(op.current_progress_key, mapping={"name": "整理蓝图库存", "progress": 50, "is_indeterminate": 1})
-            node['bp_quantity'], node['bp_jobs'] = await op.get_bp_status(node['type_id'])
+            node['bp_quantity'], node['bp_jobs'] = await op.get_bp_status(node['type_id'], plan_settings.get('considerate_bp_relation', False))
         await tqdm_manager.complete_mission(f"分类节点 {plan_name}")
         
         # 整理物流信息
@@ -526,7 +529,7 @@ class IndustryManager(metaclass=SingletonMeta):
 
         # 获取劳动力数据
         await rdm.r.hset(op.current_progress_key, mapping={"name": "获取劳动力数据", "progress": 50, "is_indeterminate": 1})
-        running_job_tableview_data = await op.get_running_job_tableview_data()
+        running_job_tableview_data = await op.get_running_job_tableview_data(plan_settings.get("considerate_running_job", False))
         
 
         return {
@@ -536,7 +539,8 @@ class IndustryManager(metaclass=SingletonMeta):
             "work_flow": work_flow,
             "purchase_output": None,
             "running_job_tableview_data": running_job_tableview_data,
-            "logistic_dict": save_logistic_data
+            "logistic_dict": save_logistic_data,
+            "plan_settings": plan_settings
         }
 
     @staticmethod
@@ -757,7 +761,7 @@ class IndustryManager(metaclass=SingletonMeta):
 
         # 获取效率 ==============================================================================================
         mater_eff, time_eff = await op.get_efficiency(product_type_id)
-        fake_mater_eff, fake_time_eff = await op.get_conf_eff(product_type_id)
+        fake_bp_mater_eff, fake_bp_time_eff = await op.get_conf_eff(product_type_id)
 
         # 根据配置 切分工作流 or 不切分 每个(product_type_id, index)只计算一次 ==============================================================================================
         real_work_list = []
@@ -793,12 +797,13 @@ class IndustryManager(metaclass=SingletonMeta):
                         "type_id": product_type_id,
                         "runs": this_round_work,
                         "bp_object": bp,
-                        "mater_eff": mater_eff * (fake_mater_eff if bp['fake'] else (1 - 0.01 * bp['material_efficiency'])),
-                        "time_eff": time_eff * (fake_time_eff if bp['fake'] else (1 - 0.01 * bp['time_efficiency'])),
+                        "mater_eff": mater_eff * (fake_bp_mater_eff if bp['fake'] else (1 - 0.01 * bp['material_efficiency'])),
+                        "time_eff": time_eff * (fake_bp_time_eff if bp['fake'] else (1 - 0.01 * bp['time_efficiency'])),
                     })
                     real_work_waiting_to_split -= this_round_work
                     op.set_uped_jobs[product_type_id] -= this_round_work
-
+                
+                # ==========================================================
                 # 计算完整任务数量（整除）和剩余工作量（取余）
                 # full_job_num: 完整任务的数量（每个任务运行 max_job_run 次）
                 # less_work: 剩余的工作量（小于 max_job_run）
@@ -811,35 +816,37 @@ class IndustryManager(metaclass=SingletonMeta):
                     # 防止除零错误
                     full_job_num = 0
                     less_work = int(min_self_index_quantity_work)
-                
                 job_list = [{
                     "type_id": product_type_id,
                     "runs": max_job_run,  # 每个完整任务运行 max_job_run 次
-                    "mater_eff": mater_eff * fake_mater_eff,
-                    "time_eff": time_eff * fake_time_eff,
+                    "mater_eff": mater_eff * fake_bp_mater_eff,
+                    "time_eff": time_eff * fake_bp_time_eff,
                     "bp_object": await op.get_bp_object(product_type_id, max_job_run, False)
                 } for _ in range(full_job_num)]
                 if less_work > 0:
                     job_list.append({
                         "type_id": product_type_id,
                         "runs": less_work,
-                        "mater_eff": mater_eff * fake_mater_eff,
-                        "time_eff": time_eff * fake_time_eff,
+                        "mater_eff": mater_eff * fake_bp_mater_eff,
+                        "time_eff": time_eff * fake_bp_time_eff,
                         "bp_object": await op.get_bp_object(product_type_id, less_work, False)
                     })
             else:
+                # ==========================================================
+                # 不切分工作流
+                # ==========================================================
                 real_work_list = [{
                     "type_id": product_type_id,
                     "runs": min_self_index_real_quantity_work,
-                    "mater_eff": mater_eff * fake_mater_eff,
-                    "time_eff": time_eff * fake_time_eff,
+                    "mater_eff": mater_eff * fake_bp_mater_eff,
+                    "time_eff": time_eff * fake_bp_time_eff,
                     "bp_object": await op.get_bp_object(product_type_id, min_self_index_real_quantity_work, False)
                 }]
                 job_list = [{
                     "type_id": product_type_id,
                     "runs": min_self_index_quantity_work,
-                    "mater_eff": mater_eff * fake_mater_eff,
-                    "time_eff": time_eff * fake_time_eff,
+                    "mater_eff": mater_eff * fake_bp_mater_eff,
+                    "time_eff": time_eff * fake_bp_time_eff,
                     "bp_object": await op.get_bp_object(product_type_id, min_self_index_quantity_work, False)
                 }]
             await op.calculate_work_material_avaliable(real_work_list)
@@ -865,12 +872,6 @@ class IndustryManager(metaclass=SingletonMeta):
                 )
             )
             logger.debug(f"real_quantity_material_need_list: {real_quantity_material_need_list}")
-        # real_quantity_material_need_list = [
-        #     ceil(
-        #         work['runs'] * self_relation['material_num'] * (1 if self_relation['material_num'] == 1 else 
-        #         (mater_eff * (fake_mater_eff if work['bp_object']['fake'] else (1 - 0.01 * work['bp_object']['material_efficiency']))))
-        #     ) for work in real_work_list
-        # ]
         activety_time = await BPM.get_production_time(product_type_id)
         real_quantity_time_need_list = [
             ceil(
@@ -887,20 +888,22 @@ class IndustryManager(metaclass=SingletonMeta):
         # 系数成本计算 ==============================================================================================
         structure_info = await op.get_type_assign_structure_info(product_type_id)
         if not structure_info:
-            raise KahunaException(f"物品 {product_type_id}: {SdeUtils.get_name_by_id(product_type_id)} 未分配建筑")
+            # raise KahunaException(f"物品 {product_type_id}: {SdeUtils.get_name_by_id(product_type_id)} 未分配建筑")
+            system_cost = {"manufacturing": 0.14 / 100, "reaction": 0.14 / 100}
+        else:
+            system_cost = await op.get_system_cost(structure_info['system_id'])
+        
         material_adjust_price = await op.get_type_adjust_price(material_type_id)
-        system_cost = await op.get_system_cost(structure_info['system_id'])
+        
         actype = "manufacturing" if self_relation['activity_id'] == 1 else "reaction"
-        eiv_cost = float(system_cost[actype]) * material_adjust_price * self_relation['material_num']
+        if "manufacturing" not in system_cost:
+            logger.error(f"system_cost {system_cost} not have {actype}")
+        eiv_cost = float(system_cost[actype] + 0.04) * material_adjust_price * self_relation['material_num']
         real_eiv_cost_list = [eiv_cost * work['runs'] for work in job_list]
-
         quantity_material_need = sum(quantity_material_need_list)
         real_quantity_material_need = sum(real_quantity_material_need_list)
         real_quantity_time_need = sum(real_quantity_time_need_list)
         real_eiv_cost_total = sum(real_eiv_cost_list)
-
-        
-        
 
         # 更新状态
         res = await NIU.update_relation_properties(
