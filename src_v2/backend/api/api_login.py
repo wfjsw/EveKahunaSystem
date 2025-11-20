@@ -6,7 +6,7 @@ from quart import current_app as app
 from src_v2.backend.auth import auth_required
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from src_v2.core.permission.permission_manager import PermissionManager
+from src_v2.core.permission.permission_manager import permission_manager
 from src_v2.core.user.user_manager import UserManager
 from src.service.log_server import logger
 from src_v2.model.EVE.character.character_manager import CharacterManager
