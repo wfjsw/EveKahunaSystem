@@ -64,5 +64,5 @@ export function setupAuthGuards(router: Router): void {
 
 export function haveRole(role: string): boolean {
   const authStore = useAuthStore()
-  return authStore.userRoles.includes(role)
+  return authStore.user?.roles.includes(role) || false
 }

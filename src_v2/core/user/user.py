@@ -25,14 +25,14 @@ class User():
     @property
     async def roles(self) -> list[str]:
         # 获取 roles
-        roles = await rdm.redis.lrange(f"l:user:roles:{self.user_name}", 0, -1)
+        roles = await rdm.redis.lrange(f"user_roles:{self.user_name}", 0, -1)
         if not roles:
             role_names = []
             async for role_obj in await UserRolesDBUtils.select_user_roles_by_user_name(self.user_name):
                 role_names.append(role_obj.role_name)
             if role_names:
-                await rdm.redis.rpush(f"l:user:roles:{self.user_name}", *role_names)
-                await rdm.redis.expire(f"l:user:roles:{self.user_name}", 60 * 60)
+                await rdm.redis.rpush(f"user_roles:{self.user_name}", *role_names)
+                await rdm.redis.expire(f"user_roles:{self.user_name}", 60)
             roles = role_names
         return roles
 
