@@ -251,7 +251,7 @@ class IndustryManager(metaclass=SingletonMeta):
             await cls._create_plan_bp_tree(plan_user_dict, product, counter)
             mission_count = await tqdm_manager.update_mission(f"create_plan_{plan_name}", 1)
             now_progress = mission_count / len(products) * 100
-            if now_progress > last_progress + 10:
+            if now_progress > last_progress + 1:
                 await rdm.r.hset(op.current_progress_key, mapping={"name": "创建计划树", "progress": now_progress})
                 last_progress = now_progress
 
@@ -408,7 +408,7 @@ class IndustryManager(metaclass=SingletonMeta):
                 flow_output[node['max_distance'] - 1]["children"].append(node)
             mission_count = await tqdm_manager.update_mission(f"分类节点 {plan_name}", 1)
             now_progress = mission_count / len(node_dict) * 100
-            if now_progress / 3 + 66 > last_progress + 10:
+            if now_progress / 3 + 66 > last_progress + 1:
                 last_progress = now_progress
             
             # 整理工作流输出
