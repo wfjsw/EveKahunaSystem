@@ -16,6 +16,10 @@ from .blueprints_model import (
 )
 from .meta_groups_model import MetaGroups
 from .market_groups_model import MarketGroups
+from .map_solar_systems_model import MapSolarSystems
+from .map_regions_model import MapRegions
+from .inv_categories_model import InvCategories
+from .inv_groups_model import InvGroups
 
 
 class SDEModelGenerator:
@@ -61,6 +65,22 @@ class SDEModelGenerator:
         # 特殊处理：marketGroups 表
         if table_name == 'marketGroups':
             return await self.create_market_groups_table(conn)
+        
+        # 特殊处理：mapSolarSystems 表
+        if table_name == 'mapSolarSystems':
+            return await self.create_map_solar_systems_table(conn)
+        
+        # 特殊处理：mapRegions 表
+        if table_name == 'mapRegions':
+            return await self.create_map_regions_table(conn)
+        
+        # 特殊处理：invCategories 表
+        if table_name == 'categories' or table_name == 'invCategories':
+            return await self.create_inv_categories_table(conn)
+        
+        # 特殊处理：invGroups 表
+        if table_name == 'groups' or table_name == 'invGroups':
+            return await self.create_inv_groups_table(conn)
         
         # 通用处理：其他表
         # 分析文件结构
@@ -238,6 +258,130 @@ class SDEModelGenerator:
             return True
         except Exception as e:
             logger.error(f"创建 MarketGroups 表失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
+    
+    async def create_map_solar_systems_table(self, conn) -> bool:
+        """
+        创建 MapSolarSystems 表（使用 SQLAlchemy 模型）
+        
+        Args:
+            conn: 数据库连接
+        
+        Returns:
+            是否成功
+        """
+        try:
+            # 确保 MapSolarSystems 模型已经被导入和注册
+            # MapSolarSystems 继承自 SDEModel，所以会被 SDEModel.registry 识别
+            
+            # 使用 PostgreDatabaseManager 的 create_default_table 方法
+            # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
+            from src_v2.core.database.connect_manager import PostgreDatabaseManager
+            db_manager = PostgreDatabaseManager()
+            
+            # 确保 MapSolarSystems 类已经被导入（通过导入语句）
+            # 由于 MapSolarSystems 继承自 SDEModel，调用 create_default_table 时会自动扫描所有注册的模型
+            await db_manager.create_default_table(conn, SDEModel)
+            
+            logger.info("已创建/检查 MapSolarSystems 表")
+            return True
+        except Exception as e:
+            logger.error(f"创建 MapSolarSystems 表失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
+    
+    async def create_map_regions_table(self, conn) -> bool:
+        """
+        创建 MapRegions 表（使用 SQLAlchemy 模型）
+        
+        Args:
+            conn: 数据库连接
+        
+        Returns:
+            是否成功
+        """
+        try:
+            # 确保 MapRegions 模型已经被导入和注册
+            # MapRegions 继承自 SDEModel，所以会被 SDEModel.registry 识别
+            
+            # 使用 PostgreDatabaseManager 的 create_default_table 方法
+            # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
+            from src_v2.core.database.connect_manager import PostgreDatabaseManager
+            db_manager = PostgreDatabaseManager()
+            
+            # 确保 MapRegions 类已经被导入（通过导入语句）
+            # 由于 MapRegions 继承自 SDEModel，调用 create_default_table 时会自动扫描所有注册的模型
+            await db_manager.create_default_table(conn, SDEModel)
+            
+            logger.info("已创建/检查 MapRegions 表")
+            return True
+        except Exception as e:
+            logger.error(f"创建 MapRegions 表失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
+    
+    async def create_inv_categories_table(self, conn) -> bool:
+        """
+        创建 InvCategories 表（使用 SQLAlchemy 模型）
+        
+        Args:
+            conn: 数据库连接
+        
+        Returns:
+            是否成功
+        """
+        try:
+            # 确保 InvCategories 模型已经被导入和注册
+            # InvCategories 继承自 SDEModel，所以会被 SDEModel.registry 识别
+            
+            # 使用 PostgreDatabaseManager 的 create_default_table 方法
+            # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
+            from src_v2.core.database.connect_manager import PostgreDatabaseManager
+            db_manager = PostgreDatabaseManager()
+            
+            # 确保 InvCategories 类已经被导入（通过导入语句）
+            # 由于 InvCategories 继承自 SDEModel，调用 create_default_table 时会自动扫描所有注册的模型
+            await db_manager.create_default_table(conn, SDEModel)
+            
+            logger.info("已创建/检查 InvCategories 表")
+            return True
+        except Exception as e:
+            logger.error(f"创建 InvCategories 表失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
+    
+    async def create_inv_groups_table(self, conn) -> bool:
+        """
+        创建 InvGroups 表（使用 SQLAlchemy 模型）
+        
+        Args:
+            conn: 数据库连接
+        
+        Returns:
+            是否成功
+        """
+        try:
+            # 确保 InvGroups 模型已经被导入和注册
+            # InvGroups 继承自 SDEModel，所以会被 SDEModel.registry 识别
+            
+            # 使用 PostgreDatabaseManager 的 create_default_table 方法
+            # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
+            from src_v2.core.database.connect_manager import PostgreDatabaseManager
+            db_manager = PostgreDatabaseManager()
+            
+            # 确保 InvGroups 类已经被导入（通过导入语句）
+            # 由于 InvGroups 继承自 SDEModel，调用 create_default_table 时会自动扫描所有注册的模型
+            await db_manager.create_default_table(conn, SDEModel)
+            
+            logger.info("已创建/检查 InvGroups 表")
+            return True
+        except Exception as e:
+            logger.error(f"创建 InvGroups 表失败: {e}")
             import traceback
             logger.error(traceback.format_exc())
             return False
