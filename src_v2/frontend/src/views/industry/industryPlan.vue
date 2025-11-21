@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ArrowRight } from '@element-plus/icons-vue'
 import { http } from '@/http'
 import { VueDraggable } from 'vue-draggable-plus'
 import IndustryPlanPlanTable from './components/industryPlanPlanTable.vue'
 import IndustryPlanConfigFlow from './components/industryPlanConfigFlow.vue'
-import { haveRole } from '@/router/guards'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const haveAlphaRole = computed(() => {
+    return authStore.user?.roles.includes('vip_alpha') || false
+})
 
 interface PlanProductTableData {
   "row_id": number,
@@ -713,11 +718,11 @@ onMounted(() => {
       </el-form-item>
       
       <el-form-item label="是否考虑库存">
-        <el-switch v-model="planForm.considerate_asset" :disabled="!haveRole('vip_alpha')" />
+        <el-switch v-model="planForm.considerate_asset" :disabled="!haveAlphaRole" />
       </el-form-item>
       
       <el-form-item label="是否考虑运行中任务">
-        <el-switch v-model="planForm.considerate_running_job" :disabled="!haveRole('vip_alpha')" />
+        <el-switch v-model="planForm.considerate_running_job" :disabled="!haveAlphaRole" />
       </el-form-item>
       
       <el-form-item label="是否按照习惯切分工作流">
@@ -725,11 +730,11 @@ onMounted(() => {
       </el-form-item>
       
       <el-form-item label="是否考虑库存蓝图">
-        <el-switch v-model="planForm.considerate_bp_relation" :disabled="!haveRole('vip_alpha')"/>
+        <el-switch v-model="planForm.considerate_bp_relation" :disabled="!haveAlphaRole"/>
       </el-form-item>
       
       <el-form-item label="蓝图拷贝完全使用">
-        <el-switch v-model="current_plan_settings.full_use_bp_cp" :disabled="!haveRole('vip_alpha')" />
+        <el-switch v-model="current_plan_settings.full_use_bp_cp" :disabled="!haveAlphaRole" />
       </el-form-item>
 
       <el-form-item label="工作安排方式">
@@ -761,11 +766,11 @@ onMounted(() => {
       </el-form-item>
       
       <el-form-item label="是否考虑库存">
-        <el-switch v-model="current_plan_settings.considerate_asset" :disabled="!haveRole('vip_alpha')" />
+        <el-switch v-model="current_plan_settings.considerate_asset" :disabled="!haveAlphaRole" />
       </el-form-item>
       
       <el-form-item label="是否考虑运行中任务">
-        <el-switch v-model="current_plan_settings.considerate_running_job" :disabled="!haveRole('vip_alpha')" />
+        <el-switch v-model="current_plan_settings.considerate_running_job" :disabled="!haveAlphaRole" />
       </el-form-item>
       
       <el-form-item label="是否按照习惯切分工作流">
@@ -773,11 +778,11 @@ onMounted(() => {
       </el-form-item>
       
       <el-form-item label="是否考虑库存蓝图">
-        <el-switch v-model="current_plan_settings.considerate_bp_relation" :disabled="!haveRole('vip_alpha')" />
+        <el-switch v-model="current_plan_settings.considerate_bp_relation" :disabled="!haveAlphaRole" />
       </el-form-item>
 
       <el-form-item label="蓝图拷贝完全使用">
-        <el-switch v-model="current_plan_settings.full_use_bp_cp" :disabled="!haveRole('vip_alpha')" />
+        <el-switch v-model="current_plan_settings.full_use_bp_cp" :disabled="!haveAlphaRole" />
       </el-form-item>
       
       <el-form-item label="工作安排方式">

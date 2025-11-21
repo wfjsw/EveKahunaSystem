@@ -62,6 +62,7 @@ const handleAddIndustrypermision = async (row: any) => {
     const data = await res.json()
     if (data.status !== 200) {
         ElMessage.error(data.message)
+        handleSearchItemCountdialogLoading.value = false
         return
     }
     ElMessage.success(data.message)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { http } from '@/http'
 import type { PlanProductTableData, PlanTableData } from './components/interfaceType.vue'
 import { ElMessage } from 'element-plus'
@@ -11,7 +11,12 @@ import WorkFlowView from './components/WorkFlowView.vue'
 import MaterialView from './components/MaterialView.vue'
 import FlowView from './components/FlowView.vue'
 import LogisticsView from './components/LogisticsView.vue'
-import { haveRole } from '@/router/guards'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const haveAlphaRole = computed(() => {
+    return authStore.user?.roles.includes('vip_alpha') || false
+})
 
 // localStorage key 前缀
 const STORAGE_KEY_PREFIX = 'plan_calculate_result_'
@@ -584,17 +589,17 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
                 />
             </el-tab-pane>
             
-            <el-tab-pane label="成本视图" v-if="haveRole('vip_alpha')">
+            <el-tab-pane label="成本视图" v-if="haveAlphaRole">
                 <CostView 
                     :-plan-calculate-e-i-v-cost-table-view="PlanCalculateEIVCostTableView"
                 />
             </el-tab-pane>
             
-            <el-tab-pane label="劳动力视图" v-if="haveRole('vip_alpha')">
+            <el-tab-pane label="劳动力视图" v-if="haveAlphaRole">
                 <LaborView :running-jobs="PlanCalculateRunningJobTableView" />
             </el-tab-pane>
 
-            <el-tab-pane label="物流视图" v-if="haveRole('vip_alpha')">
+            <el-tab-pane label="物流视图" v-if="haveAlphaRole">
                 <LogisticsView 
                     :logistics-data="PlanCalculateLogisticsTableView"
                     :selected-plan="selectedPlan"
@@ -610,6 +615,12 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
 <style scoped>
 :deep(.el-table .lack-row) {
     background-color: #ffc6c6 !important;
+    font-weight: bold !important;
+    color: #000000 !important;
+}
+
+:deep(.el-table .complete-job) {
+    background-color: #e7ffc8 !important;
     font-weight: bold !important;
     color: #000000 !important;
 }
