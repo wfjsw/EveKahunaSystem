@@ -1159,7 +1159,8 @@ class Neo4jIndustryUtils:
     @staticmethod
     async def get_relation_properties(relation_label: str, relation_index: Dict[str, Any]) -> Dict[str, Any]:
         # 获取已存在的关系的属性
-        pass
+        # TODO: 实现此方法
+        raise NotImplementedError("get_relation_properties 方法尚未实现")
 
     @staticmethod
     async def get_user_plan_node_with_distance(user_name: str, plan_name: str) -> List[Dict[str, Any]]:
@@ -1291,7 +1292,7 @@ class Neo4jIndustryUtils:
             return updated_count
 
     @staticmethod
-    async def update_relation_properties(relation_label: str, relation_index: Dict[str, Any], relation_properties: Dict[str, Any]) -> int:
+    async def update_relation_properties(relation_label: str, relation_index: Dict[str, Any], relation_properties: Dict[str, Any], max_retries: int = 50) -> int:
         """更新已存在关系的属性
         
         Args:
@@ -1323,43 +1324,81 @@ class Neo4jIndustryUtils:
             logger.warning("relation_properties 不能为空")
             return 0
         
-        async with neo4j_manager.get_transaction() as tx:
-            # 构建关系的 WHERE 条件
-            where_conditions = []
-            params = {}
-            for key, value in relation_index.items():
-                where_conditions.append(f"r.{key} = ${key}_index")
-                params[f"{key}_index"] = value
-            
-            where_clause = " AND ".join(where_conditions)
-            
-            # 构建 SET 的属性设置
-            set_props = []
-            for key, value in relation_properties.items():
-                param_key = f"prop_{key}"
-                params[param_key] = value
-                set_props.append(f"r.{key} = ${param_key}")
-            
-            set_clause = ", ".join(set_props)
-            
-            # 构建查询：匹配关系并更新属性
-            query = f"""
-            MATCH ()-[r:{relation_label}]->()
-            WHERE {where_clause}
-            SET {set_clause}
-            RETURN count(r) AS updated_count
-            """
-            
-            result = await tx.run(query, params)
-            record = await result.single()
-            updated_count = record["updated_count"] if record else 0
-            
-            logger.debug(
-                f"关系属性更新完成: relation_label={relation_label}, relation_index={relation_index}, "
-                f"updated_count={updated_count}"
-            )
-            
-            return updated_count
+        # 构建查询参数（在循环外构建，避免重复计算）
+        where_conditions = []
+        base_params = {}
+        for key, value in relation_index.items():
+            where_conditions.append(f"r.{key} = ${key}_index")
+            base_params[f"{key}_index"] = value
+        
+        where_clause = " AND ".join(where_conditions)
+        
+        # 构建 SET 的属性设置
+        set_props = []
+        for key, value in relation_properties.items():
+            param_key = f"prop_{key}"
+            base_params[param_key] = value
+            set_props.append(f"r.{key} = ${param_key}")
+        
+        set_clause = ", ".join(set_props)
+        
+        # 构建查询：匹配关系并更新属性
+        query = f"""
+        MATCH ()-[r:{relation_label}]->()
+        WHERE {where_clause}
+        SET {set_clause}
+        RETURN count(r) AS updated_count
+        """
+        
+        # 重试逻辑处理死锁
+        for attempt in range(max_retries):
+            try:
+                async with neo4j_manager.get_transaction() as tx:
+                    result = await tx.run(query, base_params)
+                    record = await result.single()
+                    updated_count = record["updated_count"] if record else 0
+                    
+                    logger.debug(
+                        f"关系属性更新完成: relation_label={relation_label}, relation_index={relation_index}, "
+                        f"updated_count={updated_count}"
+                    )
+                    
+                    return updated_count
+            except TransientError as e:
+                # 检查是否是死锁错误
+                error_code = getattr(e, 'code', '') or ''
+                is_deadlock = (
+                    'DeadlockDetected' in str(e) or 
+                    'Neo.TransientError.Transaction.DeadlockDetected' in error_code or
+                    error_code == 'Neo.TransientError.Transaction.DeadlockDetected'
+                )
+                if is_deadlock:
+                    if attempt < max_retries - 1:
+                        # 指数退避：等待时间 = 0.1 * (2^attempt) 秒，最大2秒
+                        wait_time = min(0.1 * (2 ** attempt), 2.0)
+                        logger.debug(
+                            f"检测到死锁错误，正在重试 ({attempt + 1}/{max_retries}): "
+                            f"relation_label={relation_label}, relation_index={relation_index}，"
+                            f"等待 {wait_time:.2f} 秒后重试"
+                        )
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(
+                            f"关系属性更新失败（死锁错误，已重试 {max_retries} 次）: "
+                            f"relation_label={relation_label}, relation_index={relation_index}"
+                        )
+                        raise
+                else:
+                    # 其他类型的 TransientError，直接抛出
+                    raise
+            except Exception as e:
+                # 非死锁错误，直接抛出
+                logger.error(f"关系属性更新失败: {e}")
+                raise
+        
+        # 理论上不应该到达这里（所有重试都应该抛出异常或返回），但为了类型检查添加
+        return 0
 
     @staticmethod
     async def delete_label_node(label: str):
