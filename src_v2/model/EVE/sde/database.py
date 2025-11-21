@@ -9,7 +9,7 @@ from peewee import SqliteDatabase
 
 from src_v2.core.config.config import config
 
-if config['APP']['DBTYPE'] == 'sqlite' and config['SQLITEDB']['SDEDB']:
+if config['SQLITEDB']['SDEDB']:
     db = SqliteDatabase(config['SQLITEDB']['SDEDB'])
 else:
     raise KahunaException("sde db open failed")
@@ -122,44 +122,6 @@ class InvCategories(BaseModel):
 
     class Meta:
         table_name = 'invCategories'
-
-class MapSolarSystems(BaseModel):
-    solarSystemID = IntegerField(primary_key=True)
-    solarSystemName = CharField(max_length=100, null=True)
-    regionID = IntegerField(null=True)
-    constellationID = IntegerField(null=True)
-    x = FloatField(null=True)
-    y = FloatField(null=True)
-    z = FloatField(null=True)
-    x_Min = FloatField(null=True)
-    x_Max = FloatField(null=True)
-    y_Min = FloatField(null=True)
-    y_Max = FloatField(null=True)
-    z_Min = FloatField(null=True)
-    z_Max = FloatField(null=True)
-    luminosity = FloatField(null=True)
-    border = IntegerField(null=True)
-    corridor = IntegerField(null=True)
-    fringe = IntegerField(null=True)
-    hub = IntegerField(null=True)
-    international = IntegerField(null=True)
-    regional = IntegerField(null=True)
-    security = FloatField(null=True)
-    factionID = IntegerField(null=True)
-    radius = FloatField(null=True)
-    sunTypeID = IntegerField(null=True)
-    securityClass = CharField(max_length=2, null=True)
-    solarSystemNameID = IntegerField(null=True)
-    visualEffect = CharField(max_length=50, null=True)
-    descriptionID = IntegerField(null=True)
-
-    class Meta:
-        indexes = (
-            (('constellationID',), False),
-            (('regionID',), False),
-            (('security',), False),
-        )
-        table_name = 'mapSolarSystems'
 
 class MarketGroups(BaseModel):
     marketGroupID = IntegerField(primary_key=True)

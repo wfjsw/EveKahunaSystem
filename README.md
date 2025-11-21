@@ -1,13 +1,13 @@
-
 <div align="center">
 
-# 🌟 Kahuna Bot 🌟
+# 🌟 Kahuna System 🌟
 
 ![Logo](https://github.com/user-attachments/assets/40c09a45-f898-4167-9315-20df6a1dc59a)
 
 [![开发状态](https://img.shields.io/badge/状态-开发中-yellow)](https://github.com/AraragiEro/astrbot_plugin_kahunabot)
 [![EVE Online](https://img.shields.io/badge/游戏-EVE%20Online-blue)](https://www.eveonline.com/)
-[![AstrBot](https://img.shields.io/badge/框架-AstrBot-green)](https://github.com/AstrBotDevs/AstrBot.git)
+[![Quart](https://img.shields.io/badge/框架-Quart-green)](https://github.com/AstrBotDevs/AstrBot.git)
+[![Vue3](https://img.shields.io/badge/框架-Vue3-green)](https://github.com/AstrBotDevs/AstrBot.git)
 
 _笨笨的kahuna不停的计算自己离买牛角包还有多远_
 
@@ -19,256 +19,257 @@ _一座新的**X**山拔地而起！_
 
 </div>
 
-## 📝 项目简介
+基于 Quart 和 Vue3 的 EVE Online 一体化 Web 应用平台，为玩家提供市场价格查询、成本计算、工业规划等综合服务。
 
-本插件是基于AstrBot框架的EVE Online游戏辅助机器人，为玩家提供市场价格查询、成本计算、工业规划等功能。
+## 项目简介
 
-> ⚠️ 本插件处于早期开发阶段，还有好多好多的bug~
-> 
-> 欢迎提issue~
+Kahuna System 是一个专为 EVE Online 玩家设计的 Web 应用平台，集成了市场数据分析、工业制造规划、资产统计等核心功能。平台采用现代化的前后端分离架构，提供直观的用户界面和强大的计算能力。
 
-## 📋 目录
+## 核心功能
 
-- [🌟 Kahuna Bot 🌟](#-kahuna-bot-)
-  - [📝 项目简介](#-项目简介)
-  - [📋 目录](#-目录)
-  - [⭐ 功能展示](#-功能展示)
-    - [吉他和联盟市场价格查询](#吉他和联盟市场价格查询)
-    - [成本查询](#成本查询)
-    - [工业规划与报表输出](#工业规划与报表输出)
-    - [化矿分析](#化矿分析)
-    - [可自定义数据来源的采购清单](#可自定义数据来源的采购清单)
-    - [利润分析](#利润分析)
-    - [挂单分析](#挂单分析)
-    - [资产统计](#资产统计)
-  - [😇 如何部署？](#-如何部署)
-    - [部署AstrBot](#部署astrbot)
-    - [下载插件](#下载插件)
-    - [配置插件](#配置插件)
-      - [安装依赖](#安装依赖)
-      - [准备SDE数据库](#准备sde数据库)
-      - [飞书API获取](#飞书api获取)
-      - [修改配置文件](#修改配置文件)
-  - [关于工业规划如何使用的一份粗略的说明，先凑合用](#关于工业规划如何使用的一份粗略的说明先凑合用)
-  - [🌟 支持一下](#-支持一下)
+- **市场价格查询** - 支持吉他和联盟市场实时价格查询
+- **成本计算** - 精确计算制造和采购成本
+- **工业规划** - 智能工业制造规划与报表输出
+- **化矿分析** - 矿石精炼与材料分析
+- **采购清单** - 可自定义数据来源的采购清单管理
+- **利润分析** - 深度利润分析与市场机会挖掘
+- **挂单分析** - 市场订单分析与优化建议
+- **资产统计** - 角色和公司资产统计与管理
 
----
+## 技术栈
 
-## ⭐ 功能展示
+- **后端**: Quart (Python 3.13+), Hypercorn
+- **前端**: Vue 3, TypeScript, Element Plus, ECharts
+- **数据库**: SQLite / PostgreSQL, Neo4j, Redis
+- **其他**: ESI API, OAuth2
 
-### 吉他和联盟市场价格查询
-![吉他和联盟市场价格查询](https://github.com/user-attachments/assets/fc70e5ea-51af-41b2-b947-93ccfa6aa908)
+## 快速开始
 
-### 成本查询
-![成本查询](https://github.com/user-attachments/assets/924da9e1-335d-422f-b2b3-2fbb441b6915)
+### 环境要求
 
-### 工业规划与报表输出
-![工业规划](https://github.com/user-attachments/assets/f23b7873-dbb3-48df-9ee9-4d07ed4dba21)
+- Python 3.13 或更高版本
+- Node.js 18+ (用于前端开发)
+- 数据库：SQLite (默认) 或 PostgreSQL + Neo4j + Redis (可选)
 
-![报表输出1](https://github.com/user-attachments/assets/9d2f4b57-04a4-4f31-909e-fbb72e86e4fb)
+### 安装步骤
 
-![报表输出2](https://github.com/user-attachments/assets/235c724e-f465-4966-98b8-0dc4cf7acc50)
+1. **克隆项目**
 
-### 化矿分析
-<img src="https://github.com/user-attachments/assets/8a1f865f-ec7a-416d-9640-fd87f3e46b55" height=1200>
-
-### 可自定义数据来源的采购清单
-<img src="https://github.com/user-attachments/assets/25b891e5-8bb8-4d77-b55a-f6e1c6e2d389" height=800>
-
-### 利润分析
-<img src="https://github.com/user-attachments/assets/514b9bbc-20b6-4e13-a7a5-dfb8e5db43ef" height=1200>
-
-### 挂单分析
-<img src="https://github.com/user-attachments/assets/1e05f586-66b5-4495-a431-e6b8770131c5" height=800>
-
-### 资产统计
-<img src="https://github.com/user-attachments/assets/aa6a15b5-6902-4e38-9ec7-bfb09566de89" height=800>
-
-
-👉 报表内容丰富，包括任务分解，材料采购，物流清单，工作任务等，一站式解放工业制造的脑力消耗，🫡公司级别提供智能计算服务。
-
----
-
-## 😇 如何部署？
-
-### 部署AstrBot
-
-本项目是AstrBot框架面向QQ的机器人插件，你需要先部署基于AstrBot的QQ机器人。
-
-👉 前往 [AstrBot官方仓库](https://github.com/AstrBotDevs/AstrBot.git) 获取详细部署指南。
-
-### 下载插件
-
-插件暂时没有上架插件商场，需要手动部署。
-
-首先前往plugin目录：
-```
-AstrBot/
-├── [其他文件]/
-├── data/
-│   ├── [其他文件]/
-│   ├── plugins/              # 插件目录
-```
-
-将项目clone到plugin文件夹下：
 ```bash
 git clone https://github.com/AraragiEro/astrbot_plugin_kahunabot.git
+cd astrbot_plugin_kahunabot
 ```
 
-kahunabot的目录结构如下：
+2. **安装后端依赖**
 
-```
-kahunabot/
-├── src/                    # 源代码目录
-│   ├── event/              # 事件处理模块
-│   ├── permission_checker/ # 权限检查模块
-│   ├── resource/           # 资源文件目录
-│   │   ├── css/           # 样式文件
-│   │   ├── img/           # 图片资源
-│   │   └── templates/     # 模板文件
-│   ├── rule_checker/      # 规则检查模块[废弃]
-│   ├── service/           # 服务模块
-│   │   ├── asset_server/  # 资产服务
-│   │   ├── character_server/  # 角色管理服务
-│   │   ├── config_server/  # 配置管理服务
-│   │   ├── database_server/  # 数据库服务
-│   │   ├── eveeso_server/  # eve api管理服务
-│   │   ├── feishu_server/  # 飞书api管理服务
-│   │   ├── google_server/  # 谷歌表格api管理服务
-│   │   ├── industry_server/  # 工业计算服务
-│   │   ├── log_server/  # 日志服务
-│   │   ├── market_server/ # 市场服务
-│   │   ├── sde_service/   # SDE数据服务
-│   │   ├── picture_render_service/   # html生图服务
-│   │   ├── resource/   # 静态资源
-│   │   └── user_server/   # 用户管理模块
-│   └── utils/             # 工具模块
-├── data/                   # 数据库存放目录，可选用
-├── config.toml.example    # 配置文件模板 (TOML 格式)
-├── config.ini.example     # 配置文件模板 (INI 格式，已弃用，建议使用 TOML)
-├── main.py                # 插件入口
-├── filter.py              # 权限过滤器
-└── requirements.txt       # 依赖包列表
-```
-
-### 配置插件
-
-#### 安装依赖
-
-1. 安装pyppeteer
+使用 `uv` (推荐):
 ```bash
-# 下载速度慢可以考虑使用加速源
-pip install pyppeteer -i https://pypi.tuna.tsinghua.edu.cn/simple
+uv sync
 ```
 
-2. 安装浏览器依赖
+或使用 `pip`:
 ```bash
-pyppeteer-install
-
-apt-get install -y libglib2.0-0 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libatspi2.0-0
-apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra fonts-arphic-ukai fonts-arphic-uming
-
-# 如果生成的图片中文都是方框，需要补充安装中文字体
-
+pip install -r requirements.txt
 ```
 
-#### 准备SDE数据库
+3. **安装前端依赖**
 
-- SDE数据库生成工具：**[EVE-SDE-Database-Builder](https://github.com/EVEIPH/EVE-SDE-Database-Builder.git)**
-- 官方SDE数据库更新地址：**[https://developers.eveonline.com/](https://developers.eveonline.com/)**
+```bash
+cd src_v2/frontend
+npm install
+```
 
-使用数据库生成工具处理CCP官方发布的SDE数据库，输出英文和中文的SQLite版本数据库备用。
+4. **准备 SDE 数据库**
 
-👇 参考下图 👇
+项目需要 EVE Online 的 SDE (Static Data Export) 数据库。你可以使用 [EVE-SDE-Database-Builder](https://github.com/EVEIPH/EVE-SDE-Database-Builder) 工具生成 SQLite 格式的英文和中文 SDE 数据库。
 
-![SDE数据库生成](https://github.com/user-attachments/assets/8db7c904-dbd7-4497-a0ad-efdc6358c58b)
+官方 SDE 数据下载地址: [https://developers.eveonline.com/](https://developers.eveonline.com/)
 
-#### 飞书API获取
+5. **配置 EVE API**
 
-1. 前往 **[飞书开发平台](https://open.feishu.cn/app)** 注册账号，并创建一个应用获取AppID和SecretID
+前往 [EVE Online 开发者中心](https://developers.eveonline.com/) 创建应用，获取 `CLIENT_ID` 和 `SECRET_KEY`。
 
-   ![飞书开发平台](https://github.com/user-attachments/assets/3e321503-edaa-48f8-b964-5a2d39712a73)
+6. **启动服务**
 
-   ![获取AppID和SecretID](https://github.com/user-attachments/assets/820341a3-c37d-42af-a67b-b05c0eed8706)
+开发模式:
+```bash
+python run_server.py --dev --host 0.0.0.0 --port 9527
+```
 
-2. 添加机器人应用
+生产模式:
+```bash
+# 先构建前端
+cd src_v2/frontend
+npm run build
+cd ../..
 
-   ![添加机器人应用](https://github.com/user-attachments/assets/310e6f16-93a1-45fc-b5d4-6d65b85814ba)
+# 启动服务
+python run_server.py --prod --host 0.0.0.0 --port 9527
+```
 
-3. 开通应用权限，全选云文档权限即可
+或使用提供的脚本 (Linux/macOS):
+```bash
+./run_server.sh dev    # 开发模式
+./run_server.sh start  # 生产模式
+./run_server.sh stop   # 停止服务
+```
 
-   ![开通应用权限](https://github.com/user-attachments/assets/e83653ed-3e72-4264-94a7-77ca751109fd)
+启动成功后，访问 `http://localhost:9527` 即可使用平台。
 
-4. 给机器人添加云文档权限 [如何为应用开通云文档相关资源的权限](https://open.feishu.cn/document/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-add-permissions-to-app)
+## 配置说明
 
-5. 新建一个云文档文件夹并获取链接，形式为`https://bcnzl0ndjqqq.feishu.cn/drive/folder/{folder_id}`，将folder_id记录
+### 配置文件
 
-#### 修改配置文件
+项目使用 TOML 格式的配置文件。将 `config.toml.example` 复制为 `config.toml` 并填写相应配置。
 
-**推荐使用 TOML 格式（新）**：
-将`config.toml.example`复制一份，重命名为`config.toml`，然后填写相应的配置值。
+### 主要配置项
 
-**兼容 INI 格式（旧）**：
-如果 `config.toml` 不存在，系统会自动尝试读取 `config.ini`。将`config.ini.example`复制一份，重命名为`config.ini`。
-
-> **注意**：TOML 格式支持更好的注释和类型安全，建议新项目使用 TOML 格式。配置文件会自动向后兼容，如果 `config.toml` 不存在，会回退到 `config.ini`。
-
-```ini
+#### [APP] - 应用基础配置
+```toml
 [APP]
-DBTYPE = sqlite # 数据库类型，暂时只支持sqlite。本地数据库记得多备份哦~
-COST_PLAN_USER = # 公共成本计算接口基准角色
-COST_PLAN_NAME = # 公共成本计算接口基准角色名称
-CORP_ASSET_USER =   # 
-PIC_RENDER_PROXY =  # 图片渲染代理地址，默认为空，不使用代理
-
-[FEISHU]
-APP_ID = MyApp      # 飞书表格输出相关配置
-SECRET_ID = 1.0     
-FOLDER_ROOT = xxx   # 填入刚才获取的folder_id
-
-[POSTGREDB]     # 暂未启用
-Host = localhost
-Port = 5432
-User = admin
-Password = secret
-
-[SQLITEDB] # 数据库路径，填写绝对路径
-CONFIG_DB = F:\path\to\kahuna.db
-CACHE_DB = F:\path\to\cache.db
-SDEDB = F:\path\to\sde.db           # 刚才获取的英文sde数据库
-CN_SDEDB = F:\path\to\sde_cn.db     # 刚才获取的中文sde数据库
-
-[EVE]   # eve相关配置，在https://developers.eveonline.com/申请应用获取
-CLIENT_ID =
-SECRET_KEY =
-MARKET_AC_CHARACTER_ID=     # 玩家建筑市场访问角色id，先置空
-
-[ESI]   # esi权限配置，需要和申请的应用保持一致，默认全部为true，意为全部权限，需要关闭的权限改为false。
-publicData = true
-esi-calendar.respond_calendar_events.v1 = true
-esi-calendar.read_calendar_events.v1 = true
-esi-location.read_location.v1 = true
-esi-location.read_ship_type.v1 = true
-esi-mail.organize_mail.v1 = true
-......
+# 图片渲染代理 (留空则不使用)
+PIC_RENDER_PROXY = ""
+# 代理服务器地址
+PROXY = "127.0.0.1"
+# 代理端口
+PORT = 7890
 ```
 
-## 关于工业规划如何使用的一份粗略的说明，先凑合用
+#### [SQLITEDB] - SQLite 数据库配置
+```toml
+[SQLITEDB]
+# 配置数据库路径（绝对路径）
+CONFIG_DB = "/path/to/kahuna.db"
+CACHE_DB = "/path/to/cache.db"
+# SDE 数据库路径
+SDEDB = "/path/to/sde.db"           # 英文 SDE 数据库
+CN_SDEDB = "/path/to/sde_cn.db"     # 中文 SDE 数据库
+```
 
-👉 [小卡bot初级使用指南](https://conscious-cord-0d1.notion.site/bot-1920b0a9ac1b80998d71c4349b241145)
+#### [POSTGREDB] - PostgreSQL 数据库配置 (可选)
+```toml
+[POSTGREDB]
+Host = "localhost"
+Port = 5432
+Database = "kahuna"
+User = "admin"
+Password = "secret"
+```
 
-## TODO LIST
- - [x] QQbot开发
- - [ ] 网站开发
-   - [ ] 前端开发
-     - [ ] 框架
-   - [x] esi访问队列控制
-   - [ ] 数据库重构
-     - [x] 部署postgre和redis
+#### [REDIS] - Redis 配置 (可选)
+```toml
+[REDIS]
+Host = "localhost"
+Port = 6379
+```
 
-## 🌟 支持一下
-求个star。
-觉得好用的话，给孩子打点ISK呗~ 
+#### [NEO4J] - Neo4j 图数据库配置 (可选)
+```toml
+[NEO4J]
+Host = "localhost"
+Port = 7687
+Username = "neo4j"
+Password = "password"
+```
 
-`EVE_ID: Alero AraragiEro`
+#### [EVE] - EVE Online API 配置
+```toml
+[EVE]
+# 在 https://developers.eveonline.com/ 申请应用获取
+CLIENT_ID = "your_client_id"
+SECRET_KEY = "your_secret_key"
+# 回调地址
+CALLBACK_LOCAL_HOST = ""
+CALLBACK_LOCAL_ADD = "https://localhost:9527/"
+```
 
+#### [ESI] - ESI API 权限配置
+
+根据你的需求启用或禁用相应的 ESI 权限。常用权限示例：
+
+```toml
+[ESI]
+# 公共数据访问
+publicData = false
+
+# 资产相关权限
+"esi-assets.read_assets.v1" = true
+"esi-assets.read_corporation_assets.v1" = true
+
+# 市场相关权限
+"esi-markets.structure_markets.v1" = true
+"esi-markets.read_character_orders.v1" = true
+
+# 工业相关权限
+"esi-industry.read_character_jobs.v1" = true
+"esi-industry.read_corporation_jobs.v1" = true
+
+# 蓝图相关权限
+"esi-characters.read_blueprints.v1" = true
+"esi-corporations.read_blueprints.v1" = true
+
+# 技能相关权限
+"esi-skills.read_skills.v1" = true
+
+# 钱包相关权限
+"esi-wallet.read_character_wallet.v1" = true
+```
+
+完整的权限列表请参考 `config.toml.example` 文件。
+
+### 配置文件位置
+
+配置文件应命名为 `config.toml` 并放置在项目根目录。
+
+## 开发计划
+
+
+- [x] Web 应用平台开发
+  - [x] 前端框架搭建
+  - [x] ESI 访问队列控制
+  - [x] 数据库重构
+    - [x] PostgreSQL 和 Redis 部署
+- [ ] 核心功能
+  - [x] 工业计划的计算与拆解
+    - [x] 可调整的产品清单
+    - [x] 可调整的计算配置
+    - [x] 详细的数据报表
+      - [x] 计划分解树
+      - [x] 材料清单
+      - [x] 可参考可执行的工作流
+      - [x] 可复制的采购清单
+      - [x] 成本成分比例分析
+      - [x] 合作工业的薪水计算
+      - [x] 可参考的物流计划
+  - [ ] 市场分析
+    - [ ] 市场价格查看
+    - [ ] 自选清单的价格监控
+    - [ ] 自选产品清单的利润计算
+    - [ ] 市场单品的详细数据计算【成本、利润等】
+    - [ ] 特定星域的市场利润计算
+- [ ] 其他
+  - [x] 服务权限分级
+  - [ ] 邀请码生成
+  - [ ] 性能优化
+  - [ ] 用户体验改进
+  - [ ] 文档完善
+
+## 许可证
+
+本项目采用 **GNU Affero General Public License v3.0 (AGPL-3.0)** 许可证。
+
+这意味着：
+- 你可以自由使用、修改和分发本软件
+- 如果你修改了代码并在网络上提供服务，必须公开修改后的源代码
+- 使用本软件的服务也必须遵循 AGPL-3.0 许可证
+
+完整的许可证文本请查看 [LICENSE](LICENSE) 文件。
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 相关链接
+
+- [EVE Online 官网](https://www.eveonline.com/)
+- [EVE Online 开发者中心](https://developers.eveonline.com/)
