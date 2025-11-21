@@ -717,3 +717,51 @@ class EveIndustryPlanConfigFlowDBUtils(_CommonUtils):
     async def select_all_by_user_name(cls, user_name: str):
         stmt = select(cls.cls_model).where(cls.cls_model.user_name == user_name).order_by(cls.cls_model.id)
         return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+class InvitCodeDBUtils(_CommonUtils):
+    cls_model = model.InvitCode
+
+    @classmethod
+    async def select_invite_code_by_code(cls, invite_code: str, session=None):
+        """根据邀请码查询"""
+        if not session:
+            async with dbm.get_session() as session:
+                stmt = select(cls.cls_model).where(cls.cls_model.invite_code == invite_code)
+                result = await session.execute(stmt)
+                return result.scalars().first()
+        else:
+            stmt = select(cls.cls_model).where(cls.cls_model.invite_code == invite_code)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
+    @classmethod
+    async def select_invite_codes_by_creator(cls, creator_user_name: str):
+        """根据创建者查询邀请码列表"""
+        stmt = select(cls.cls_model).where(cls.cls_model.creator_user_name == creator_user_name).order_by(cls.cls_model.create_date.desc())
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+    @classmethod
+    async def select_all_invite_codes(cls, only_available: bool = False):
+        """查询所有邀请码，支持筛选未使用完的"""
+        if only_available:
+            stmt = select(cls.cls_model).where(
+                cls.cls_model.used_count_current < cls.cls_model.used_count_max
+            ).order_by(cls.cls_model.create_date.desc())
+        else:
+            stmt = select(cls.cls_model).order_by(cls.cls_model.create_date.desc())
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+class InviteCodeUsedHistoryDBUtils(_CommonUtils):
+    cls_model = model.InviteCodeUsedHistory
+
+    @classmethod
+    async def select_history_by_invite_code(cls, invite_code: str):
+        """根据邀请码查询使用记录"""
+        stmt = select(cls.cls_model).where(cls.cls_model.invite_code == invite_code).order_by(cls.cls_model.used_date.desc())
+        return await _AsyncIteratorWrapper.from_stmt(stmt)
+
+    @classmethod
+    async def select_history_by_user(cls, used_user_name: str):
+        """根据用户查询使用记录"""
+        stmt = select(cls.cls_model).where(cls.cls_model.used_user_name == used_user_name).order_by(cls.cls_model.used_date.desc())
+        return await _AsyncIteratorWrapper.from_stmt(stmt)

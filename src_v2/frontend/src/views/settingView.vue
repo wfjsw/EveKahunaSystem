@@ -2,12 +2,13 @@
 import { ref } from 'vue'
 import SidebarLayout from '../components/SidebarLayout.vue'
 import settingSidebar from '../components/sideBar/mainSidebar.vue'
+import { haveRole } from '@/router/guards'
 
-const menuItems = ref([
-  { index: 1, label: '角色设置', route: '/setting/characterSetting'},
-  { index: 2, label: '工业配置', route: '/setting/industrySetting'},
-  { index: 3, label: '账号配置', route: '/setting/accountSetting'}
-])
+const menuItems = ref<{index: number, label: string, route: string}[]>([])
+if (haveRole('vip_alpha')) {
+  menuItems.value.push({ index: 1, label: '角色设置', route: '/setting/characterSetting'})
+}
+menuItems.value.push({ index: 2, label: '账号配置', route: '/setting/accountSetting'})
 
 </script>
 

@@ -4,18 +4,6 @@
 # 复制此文件为 config.toml 并填写相应的配置值
 
 [APP]
-# 数据库类型: sqlite, postgresql
-DBTYPE = "sqlite"
-
-# 成本计划用户ID
-COST_PLAN_USER = 0
-
-# 成本计划名称
-COST_PLAN_NAME = ""
-
-# 公司资产用户ID
-CORP_ASSET_USER = 0
-
 # 图片渲染代理 (留空则不使用)
 PIC_RENDER_PROXY = ""
 
@@ -25,22 +13,8 @@ PROXY = "127.0.0.1"
 # 代理端口
 PORT = 7890
 
-[FEISHU]
-# 飞书应用ID
-APP_ID = ""
-
-# 飞书密钥
-SECRET_ID = ""
-
-# 文件夹根目录ID
-FOLDER_ROOT = ""
-
-[GOOGLE]
-# Google API 凭证文件路径
-CREDENTIALS = ""
-
-# 市场监控电子表格ID
-MARKET_MONITOR_SPREADSHEET_ID = ""
+# SECRET_KEY
+SECRET_KEY = "生成一个安全的随机密钥"
 
 [POSTGREDB]
 # PostgreSQL 数据库配置
@@ -69,19 +43,47 @@ CACHE_DB = ""
 SDEDB = ""
 CN_SDEDB = ""
 
+[SDEDB]
+# SDE 数据库配置（独立于主数据库）
+Host = ""
+Port = 5432
+Database = "sde"
+User = ""
+Password = ""
+
+[SDE_BUILDER]
+# SDE 最新版本信息 API
+Latest_Version_URL = "https://developers.eveonline.com/static-data/tranquility/latest.jsonl"
+# SDE 最新数据包下载地址（JSONL 格式）
+Latest_Download_URL = "https://developers.eveonline.com/static-data/eve-online-static-data-latest-jsonl.zip"
+# 下载文件保存路径
+Download_Path = "download_resource/sde"
+# 解压临时目录
+Extract_Path = "tmp/sde"
+# 当前已安装的版本号（用于版本检查，0 表示未安装）
+Current_Build_Number = 0
+# 解析白名单（文件名列表，不含 .jsonl 后缀，空列表表示不解析任何文件）
+# 示例: Parse_Whitelist = ["types", "groups", "categories"]
+Parse_Whitelist = [
+    "types",
+    "blueprints",
+    "MetaGroups",
+    "metaGroups",
+    "groups",
+    "categories",
+    "marketGroups",
+    "mapSolarSystems",
+    "mapRegions"
+]
+# 是否启用自动更新检查
+Auto_Update = false
+# 更新检查间隔（小时）
+Update_Interval = 24
+
 [EVE]
 # EVE Online API 配置
 CLIENT_ID = ""
 SECRET_KEY = ""
-
-# 市场账户角色ID
-MARKET_AC_CHARACTER_ID = 0
-
-# 参考材料权重
-REF_MATER_WEIGHT = 0.3
-
-# 参考利润权重
-REF_PROFIT_WEIGHT = 0.7
 
 # 回调本地主机
 CALLBACK_LOCAL_HOST = ""

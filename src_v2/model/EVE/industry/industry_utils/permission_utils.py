@@ -84,7 +84,7 @@ async def get_user_all_container_permission(user_id: str):
         elif owner_type == 'corp':
             owner = await eveesi.corporations_corporation_id(pull_mission.asset_owner_id)
             owner_name = owner['name']
-        system_info = SdeUtils.get_system_info_by_id(container.system_id)
+        system_info = await SdeUtils.get_system_info_by_id(container.system_id)
         structure_info_cache = await rdm.redis.hgetall(f'eveesi:universe_structures_structure:{container.structure_id}')
         if not structure_info_cache:
             structure_info_cache = await eveesi.universe_structures_structure(access_character.ac_token, container.structure_id)

@@ -3,9 +3,10 @@
 import os
 from pathlib import Path
 from quart import Quart, send_from_directory, request
+from src_v2.core.config.config import config
 
 app = Quart(__name__)
-app.secret_key = "生成一个安全的随机密钥"  # 在生产环境中应使用强随机密钥
+app.secret_key = config['APP']['SECRET_KEY']
 
 from .api import init_api
 

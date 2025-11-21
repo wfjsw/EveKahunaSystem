@@ -57,6 +57,13 @@ async def cleanup_resources():
         print(f"[清理] PostgreSQL 连接关闭时出错: {e}")
     
     try:
+        # 关闭 SDE 数据库连接
+        from src_v2.model.EVE.sde.utils import SdeUtils
+        await SdeUtils.close_database()
+    except Exception as e:
+        print(f"[清理] SDE 数据库连接关闭时出错: {e}")
+    
+    try:
         # 关闭 Redis 连接（如果有 close 方法）
         if hasattr(redis_manager, 'close'):
             await redis_manager.close()
@@ -120,6 +127,8 @@ async def main():
 
     # 初始化数据库和基础服务
     await init_database()
+    from src_v2.model.EVE.sde.utils import SdeUtils
+    await SdeUtils.init_database()
     await init_esi_manager()
     await permission_manager.init_base_roles()
 

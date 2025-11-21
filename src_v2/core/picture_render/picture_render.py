@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from pyppeteer import launch
 import math
 
-from ..sde_service import SdeUtils
+from ...model.EVE.sde import SdeUtils
 from ..market_server import MarketManager
 from ..config_server.config import config
 from ..evesso_server import eveesi
@@ -58,7 +58,7 @@ class PictureRender():
     async def render_price_res_pic(cls, item_id: int, price_data: list, history_data: list, order_data):
         # 准备实时价格数据
         max_buy, mid_price, min_sell, fuzz_list = price_data
-        item_name = SdeUtils.get_name_by_id(item_id)
+        item_name = await SdeUtils.get_name_by_id(item_id)
 
         cls.check_tmp_dir()
 
@@ -71,7 +71,7 @@ class PictureRender():
         # 根据是否有模糊匹配结果选择模板
         try:
             # 下载并转换物品图片
-            item_image_path = await cls.download_eve_item_image(SdeUtils.get_id_by_name(item_name))  # 这里的ID需要根据实际物品ID修改
+            item_image_path = await cls.download_eve_item_image(await SdeUtils.get_id_by_name(item_name))  # 这里的ID需要根据实际物品ID修改
             item_image_base64 = cls.get_image_base64(item_image_path) if item_image_path else None
             env.filters['format_number'] = format_number
             # 假设 order_data 是你原有的订单数据字典
@@ -143,8 +143,8 @@ class PictureRender():
 
         # 1.
         item_id = single_cost_data['type_id']
-        item_name = SdeUtils.get_name_by_id(item_id)
-        iten_name_cn = SdeUtils.get_cn_name_by_id(item_id)
+        item_name = await SdeUtils.get_name_by_id(item_id)
+        iten_name_cn = await SdeUtils.get_cn_name_by_id(item_id)
         item_icon_url = await cls.get_eve_item_icon_base64(item_id)
 
         # 3.
@@ -240,12 +240,12 @@ class PictureRender():
             data = {
                 'icon': await PictureRender.get_eve_item_icon_base64(asset.type_id),
                 'id': asset.type_id,
-                'name': SdeUtils.get_name_by_id(asset.type_id),
-                'cn_name': SdeUtils.get_cn_name_by_id(asset.type_id),
+                'name': await SdeUtils.get_name_by_id(asset.type_id),
+                'cn_name': await SdeUtils.get_cn_name_by_id(asset.type_id),
                 'price': price,
                 'quantity': asset.quantity,
-                'country': SdeUtils.get_market_group_list(asset.type_id, zh=True)[-2],
-                'ship_type': SdeUtils.get_groupname_by_id(asset.type_id, zh=True)
+                'country': (await SdeUtils.get_market_group_list(asset.type_id, zh=True))[-2],
+                'ship_type': await SdeUtils.get_groupname_by_id(asset.type_id, zh=True)
             }
             items.append(data)
         items.sort(key=lambda x: x['ship_type'], reverse=True)

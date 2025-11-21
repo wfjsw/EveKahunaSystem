@@ -9,7 +9,9 @@ from src_v2.core.utils import tqdm_manager
 
 # 本地导入 - EVE 模块
 from src_v2.model.EVE.sde import SdeUtils
-from src_v2.model.EVE.sde.database import InvTypes, MarketGroups
+from src_v2.model.EVE.sde.sde_builder import InvTypes, MarketGroups
+from src_v2.model.EVE.sde.utils import get_db_manager
+from sqlalchemy import select
 
 # 本地导入 - 相对导入
 from ..blueprint import BPManager as BPM
@@ -90,7 +92,7 @@ class MarketTree():
         # 先创建所有节点
         async def create_market_group_node_with_semaphore(market_group: MarketGroups):
             async with neo4j_manager.semaphore:
-                cn_name = SdeUtils.get_market_group_name_by_groupid(market_group.marketGroupID, zh=True)
+                cn_name = await SdeUtils.get_market_group_name_by_groupid(market_group.marketGroupID, zh=True)
                 await NIU.merge_node(
                     "MarketGroup",
                     {"market_group_id": market_group.marketGroupID},
@@ -98,23 +100,26 @@ class MarketTree():
                         "market_group_id": market_group.marketGroupID,
                         "has_types": market_group.hasTypes,
                         "icon_id": market_group.iconID,
-                        "name_id": market_group.nameID,
+                        "name_id": market_group.nameID_en,
                         "name_id_zh": cn_name,
                     }
                 )
                 await tqdm_manager.update_mission("init_market_tree", 1)
         tasks = []
-        market_group_data = MarketGroups.select()
-        await tqdm_manager.add_mission("init_market_tree", len(market_group_data))
-        for market_group in market_group_data:
-            tasks.append(asyncio.create_task(create_market_group_node_with_semaphore(market_group)))
+        async with (await get_db_manager()).get_session() as session:
+            stmt = select(MarketGroups)
+            result = await session.execute(stmt)
+            market_group_data = result.scalars().all()
+            await tqdm_manager.add_mission("init_market_tree", len(market_group_data))
+            for market_group in market_group_data:
+                tasks.append(asyncio.create_task(create_market_group_node_with_semaphore(market_group)))
         await asyncio.gather(*tasks)
         await tqdm_manager.complete_mission("init_market_tree")
 
         # 再创建所有关系
         async def link_market_group_to_market_group_with_semaphore(market_group: MarketGroups):
             async with neo4j_manager.semaphore:
-                cn_name = SdeUtils.get_market_group_name_by_groupid(market_group.marketGroupID, zh=True)
+                cn_name = await SdeUtils.get_market_group_name_by_groupid(market_group.marketGroupID, zh=True)
                 await NIU.link_node(
                     "MarketGroup",
                     {"market_group_id": market_group.marketGroupID},
@@ -127,12 +132,15 @@ class MarketTree():
                     {"market_group_id": market_group.parentGroupID},
                 )
                 await tqdm_manager.update_mission("link_type_to_market_group", 1)
-        market_group_data = MarketGroups.select()
-        tasks = []
-        await tqdm_manager.add_mission("init_market_tree", len(market_group_data))
-        for market_group in market_group_data:
-            if market_group.parentGroupID:
-                tasks.append(asyncio.create_task(link_market_group_to_market_group_with_semaphore(market_group)))
+        async with (await get_db_manager()).get_session() as session:
+            stmt = select(MarketGroups)
+            result = await session.execute(stmt)
+            market_group_data = result.scalars().all()
+            tasks = []
+            await tqdm_manager.add_mission("init_market_tree", len(market_group_data))
+            for market_group in market_group_data:
+                if market_group.parentGroupID:
+                    tasks.append(asyncio.create_task(link_market_group_to_market_group_with_semaphore(market_group)))
         await asyncio.gather(*tasks)
         await tqdm_manager.complete_mission("init_market_tree")
 
@@ -150,10 +158,10 @@ class MarketTree():
 
         async def link_type_to_market_group_with_semaphore(type: InvTypes):
             async with neo4j_manager.semaphore:
-                cn_name = SdeUtils.get_cn_name_by_id(type.typeID)
-                meta_group_name = SdeUtils.get_metaname_by_metaid(type.typeID)
-                category_name = SdeUtils.get_category_by_id(type.typeID)
-                category_name_zh = SdeUtils.get_category_by_id(type.typeID, zh=True)
+                cn_name = await SdeUtils.get_cn_name_by_id(type.typeID)
+                meta_group_name = await SdeUtils.get_metaname_by_metaid(type.typeID)
+                category_name = await SdeUtils.get_category_by_id(type.typeID)
+                category_name_zh = await SdeUtils.get_category_by_id(type.typeID, zh=True)
                 bp_id = await BPM.get_bp_id_by_prod_typeid(type.typeID)
 
                 await NIU.link_node(
@@ -161,7 +169,7 @@ class MarketTree():
                     {"type_id": type.typeID},
                     {
                         "type_id": type.typeID,
-                        "type_name": type.typeName,
+                        "type_name": type.typeName_en,
                         "type_name_zh": cn_name,
                         "meta_group_name": meta_group_name,
                         "category_name": category_name,
@@ -176,14 +184,17 @@ class MarketTree():
                     {"market_group_id": type.marketGroupID}
                 )
                 await tqdm_manager.update_mission("link_type_to_market_group", 1)
-        type_data = InvTypes.select()
-        tasks = []
-        await tqdm_manager.add_mission("link_type_to_market_group", len(type_data))
-        for type in type_data:
-            if type.marketGroupID:
-                tasks.append(asyncio.create_task(link_type_to_market_group_with_semaphore(type)))
-            else:
-                await tqdm_manager.update_mission("link_type_to_market_group", 1)
+        async with (await get_db_manager()).get_session() as session:
+            stmt = select(InvTypes)
+            result = await session.execute(stmt)
+            type_data = result.scalars().all()
+            tasks = []
+            await tqdm_manager.add_mission("link_type_to_market_group", len(type_data))
+            for type in type_data:
+                if type.marketGroupID:
+                    tasks.append(asyncio.create_task(link_type_to_market_group_with_semaphore(type)))
+                else:
+                    await tqdm_manager.update_mission("link_type_to_market_group", 1)
         await asyncio.gather(*tasks)
         await tqdm_manager.complete_mission("link_type_to_market_group")
 

@@ -1,11 +1,12 @@
 from functools import wraps
-from peewee import DoesNotExist
-from typing import Callable, Optional
+from typing import Callable, Optional, List
 from cachetools import LRUCache
 import asyncio
+from sqlalchemy import select
 
 from ..sde import SdeUtils
-from ..sde.database import IndustryActivityMaterials, IndustryActivityProducts, IndustryBlueprints, InvTypes, IndustryActivities
+from ..sde.sde_builder import IndustryActivityMaterials, IndustryActivityProducts, IndustryBlueprints, InvTypes, IndustryActivities
+from ..sde.utils import get_db_manager
 from src_v2.core.database.neo4j_utils import Neo4jIndustryUtils as NIU
 from src_v2.core.database.connect_manager import neo4j_manager
 from src_v2.core.utils import tqdm_manager
@@ -70,31 +71,39 @@ class BPManager:
     @classmethod
     @async_lru_cache(maxsize=1000)
     async def get_bp_materials(cls, type_id: int) -> dict:
-        material_search = (
-            IndustryActivityMaterials
-                .select(IndustryActivityMaterials.materialTypeID, IndustryActivityMaterials.quantity)
+        async with (await get_db_manager()).get_session() as session:
+            stmt = (
+                select(IndustryActivityMaterials.materialTypeID, IndustryActivityMaterials.quantity)
+                .select_from(IndustryActivityMaterials)
                 .join(IndustryActivityProducts,
-                      on=(IndustryActivityMaterials.blueprintTypeID==IndustryActivityProducts.blueprintTypeID))
-                .where((IndustryActivityProducts.productTypeID==type_id) &
+                      IndustryActivityMaterials.blueprintTypeID == IndustryActivityProducts.blueprintTypeID)
+                .where((IndustryActivityProducts.productTypeID == type_id) &
                        (IndustryActivityProducts.blueprintTypeID != 45732) &
                        ((IndustryActivityMaterials.activityID == 1) | (IndustryActivityMaterials.activityID == 11)))
-        )
-        return {material.materialTypeID: material.quantity for material in material_search}
+            )
+            result = await session.execute(stmt)
+            return {row[0]: row[1] for row in result}
 
     @classmethod
     @async_lru_cache(maxsize=1000)
     async def get_bp_product_quantity_typeid(cls, type_id: int) -> int:
         try:
             #45732是一个测试用数据，会导致误判，需要特殊处理
-            product_quantity = IndustryActivityProducts.select(IndustryActivityProducts.quantity).where(
-                (IndustryActivityProducts.productTypeID == type_id) &
-                (IndustryActivityProducts.blueprintTypeID != 45732)
-            ).get().quantity
-        except DoesNotExist:
-            logger.warning(f"get_bp_product_quantity_typeid: {type_id} not found")
-            product_quantity = 1  # 或者你想要的默认值
-
-        return product_quantity
+            async with (await get_db_manager()).get_session() as session:
+                stmt = (
+                    select(IndustryActivityProducts.quantity)
+                    .where((IndustryActivityProducts.productTypeID == type_id) &
+                           (IndustryActivityProducts.blueprintTypeID != 45732))
+                )
+                result = await session.execute(stmt)
+                product_quantity = result.scalar_one_or_none()
+                if product_quantity is None:
+                    logger.warning(f"get_bp_product_quantity_typeid: {type_id} not found")
+                    return 1
+                return product_quantity
+        except Exception as e:
+            logger.warning(f"get_bp_product_quantity_typeid: {type_id} error: {e}")
+            return 1
 
     # @classmethod
     # def get_formula_id_by_prod_typeid(cls, type_id: int, unrefined: bool = False) -> int:
@@ -116,32 +125,49 @@ class BPManager:
 
     @classmethod
     @async_lru_cache(maxsize=100)
-    async def get_bp_id_by_prod_typeid(cls, type_id: int) -> int:
-        return (
-            IndustryActivityProducts
-                 .select(IndustryActivityProducts.blueprintTypeID)
-                 .where((IndustryActivityProducts.productTypeID == type_id) &
-                        (IndustryActivityProducts.blueprintTypeID != 45732)).scalar()
-        )
+    async def get_bp_id_by_prod_typeid(cls, type_id: int) -> Optional[int]:
+        async with (await get_db_manager()).get_session() as session:
+            # 优先选择制造活动（activityID == 1），其次选择反应活动（activityID == 11）
+            # 因为同一个产品可能对应多个蓝图（制造、研究、复制等），需要明确选择
+            stmt = (
+                select(IndustryActivityProducts.blueprintTypeID)
+                .where((IndustryActivityProducts.productTypeID == type_id) &
+                       (IndustryActivityProducts.blueprintTypeID != 45732) &
+                       ((IndustryActivityProducts.activityID == 1) | (IndustryActivityProducts.activityID == 11)))
+                .order_by(IndustryActivityProducts.activityID)  # 优先 activityID == 1
+                .limit(1)
+            )
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
 
     @classmethod
     @async_lru_cache(maxsize=100)
     async def get_bp_id_by_pbpname(cls, bp_name) -> Optional[int]:
-        bp_maybe_type_id = SdeUtils.get_id_by_name(bp_name)
+        bp_maybe_type_id = await SdeUtils.get_id_by_name(bp_name)
         if not bp_maybe_type_id:
             return None
-        bp_id = (IndustryActivityProducts
-                 .select(IndustryActivityProducts.blueprintTypeID)
-                 .where(IndustryActivityProducts.blueprintTypeID == bp_maybe_type_id)
-                 .scalar())
-        if bp_id:
-            return bp_id
+        async with (await get_db_manager()).get_session() as session:
+            stmt = (
+                select(IndustryActivityProducts.blueprintTypeID)
+                .where(IndustryActivityProducts.blueprintTypeID == bp_maybe_type_id)
+            )
+            result = await session.execute(stmt)
+            bp_id = result.scalar_one_or_none()
+            if bp_id:
+                return bp_id
         return None
 
     @classmethod
     @async_lru_cache(maxsize=1000)
     async def check_product_id_existence(cls, product_type_id: int) -> bool:
-        return IndustryActivityProducts.select().where(IndustryActivityProducts.productTypeID == product_type_id).exists()
+        async with (await get_db_manager()).get_session() as session:
+            stmt = (
+                select(IndustryActivityProducts.productTypeID)
+                .where(IndustryActivityProducts.productTypeID == product_type_id)
+                .limit(1)
+            )
+            result = await session.execute(stmt)
+            return result.first() is not None
 
     @classmethod
     @async_lru_cache(maxsize=1000)
@@ -198,13 +224,19 @@ class BPManager:
 
     @classmethod
     @async_lru_cache(maxsize=500)
-    async def get_activity_id_by_product_typeid(cls, product_typeid: int) -> int:
-        return IndustryActivityProducts.select(
-            IndustryActivityProducts.activityID
-        ).where(
-            (IndustryActivityProducts.productTypeID == product_typeid) &
-            (IndustryActivityProducts.blueprintTypeID != 45732)
-        ).scalar()
+    async def get_activity_id_by_product_typeid(cls, product_typeid: int) -> Optional[int]:
+        async with (await get_db_manager()).get_session() as session:
+            # 优先选择制造活动（activityID == 1），其次选择反应活动（activityID == 11）
+            stmt = (
+                select(IndustryActivityProducts.activityID)
+                .where((IndustryActivityProducts.productTypeID == product_typeid) &
+                       (IndustryActivityProducts.blueprintTypeID != 45732) &
+                       ((IndustryActivityProducts.activityID == 1) | (IndustryActivityProducts.activityID == 11)))
+                .order_by(IndustryActivityProducts.activityID)  # 优先 activityID == 1
+                .limit(1)
+            )
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
 
     @classmethod
     @async_lru_cache(maxsize=1000)
@@ -224,91 +256,111 @@ class BPManager:
         }
         
         try:
-            # 获取产品基本信息
-            product = InvTypes.get(InvTypes.typeID == product_id)
-            blueprint_details['product_info'] = {
-                'typeID': product.typeID,
-                'typeName': product.typeName,
-                'description': product.description,
-                'mass': product.mass,
-                'volume': product.volume,
-                'basePrice': product.basePrice
-            }
-            
-            # 获取所有与该产品相关的蓝图活动材料
-            materials = IndustryActivityMaterials.select(
-                    IndustryActivityMaterials.materialTypeID,
-                    IndustryActivityMaterials.quantity  # 
-                ).join(
-                IndustryActivityProducts,
-                on=(IndustryActivityMaterials.blueprintTypeID == 
-                    IndustryActivityProducts.blueprintTypeID)
-            ).where((IndustryActivityProducts.productTypeID == product_id) &
-                    (IndustryActivityProducts.blueprintTypeID != 45732) &
-                    ((IndustryActivityMaterials.activityID == 1) | (IndustryActivityMaterials.activityID == 11)))
-            
-            for material in materials:
-                blueprint_details['materials'].append({
-                    'material_typeID': material.materialTypeID,
-                    'quantity': material.quantity
-                })
-            
-            # 获取所有与该产品相关的蓝图活动信息
-            # 首先通过 IndustryActivityProducts 获取 blueprintTypeID
-            blueprint_type_id = IndustryActivityProducts.select(
-                IndustryActivityProducts.blueprintTypeID
-            ).where(
-                (IndustryActivityProducts.productTypeID == product_id) &
-                (IndustryActivityProducts.blueprintTypeID != 45732)
-            ).get().blueprintTypeID
-            
-            # 然后使用 blueprintTypeID 查询 IndustryActivities
-            activities = IndustryActivities.select(
-                IndustryActivities.activityID,
-                IndustryActivities.time
-            ).where(
-                (IndustryActivities.blueprintTypeID == blueprint_type_id) &
-                (IndustryActivities.blueprintTypeID != 45732)
-            )
-            
-            for activity in activities:
-                blueprint_details['activities'].append({
-                    'activityID': activity.activityID,
-                    'time': activity.time
-                })
+            async with (await get_db_manager()).get_session() as session:
+                # 获取产品基本信息
+                stmt = select(InvTypes).where(InvTypes.typeID == product_id)
+                result = await session.execute(stmt)
+                product = result.scalar_one_or_none()
+                
+                if not product:
+                    return None
+                
+                blueprint_details['product_info'] = {
+                    'typeID': product.typeID,
+                    'typeName': product.typeName_en,
+                    'description': product.description_en,
+                    'mass': product.mass,
+                    'volume': product.volume,
+                    'basePrice': product.basePrice
+                }
+                
+                # 获取所有与该产品相关的蓝图活动材料
+                stmt = (
+                    select(IndustryActivityMaterials.materialTypeID, IndustryActivityMaterials.quantity)
+                    .select_from(IndustryActivityMaterials)
+                    .join(IndustryActivityProducts,
+                          IndustryActivityMaterials.blueprintTypeID == IndustryActivityProducts.blueprintTypeID)
+                    .where((IndustryActivityProducts.productTypeID == product_id) &
+                           (IndustryActivityProducts.blueprintTypeID != 45732) &
+                           ((IndustryActivityMaterials.activityID == 1) | (IndustryActivityMaterials.activityID == 11)))
+                )
+                result = await session.execute(stmt)
+                for row in result:
+                    blueprint_details['materials'].append({
+                        'material_typeID': row[0],
+                        'quantity': row[1]
+                    })
+                
+                # 获取所有与该产品相关的蓝图活动信息
+                # 首先通过 IndustryActivityProducts 获取 blueprintTypeID
+                stmt = (
+                    select(IndustryActivityProducts.blueprintTypeID)
+                    .where((IndustryActivityProducts.productTypeID == product_id) &
+                           (IndustryActivityProducts.blueprintTypeID != 45732))
+                )
+                result = await session.execute(stmt)
+                blueprint_type_id_row = result.first()
+                if not blueprint_type_id_row:
+                    return None
+                blueprint_type_id = blueprint_type_id_row[0]
+                
+                # 然后使用 blueprintTypeID 查询 IndustryActivities
+                stmt = (
+                    select(IndustryActivities.activityID, IndustryActivities.time)
+                    .where((IndustryActivities.blueprintTypeID == blueprint_type_id) &
+                           (IndustryActivities.blueprintTypeID != 45732))
+                )
+                result = await session.execute(stmt)
+                for row in result:
+                    blueprint_details['activities'].append({
+                        'activityID': row[0],
+                        'time': row[1]
+                    })
 
-        except DoesNotExist as e:
+        except Exception as e:
+            logger.warning(f"get_blueprint_details error for product_id={product_id}: {e}")
             return None
         
         return blueprint_details
 
     @classmethod
-    async def get_typeid_by_bpid(cls, blueprint_id: int):
-        return (IndustryActivityProducts.select(IndustryActivityProducts.productTypeID)
-                                  .where(IndustryActivityProducts.blueprintTypeID == blueprint_id).scalar())
+    async def get_typeid_by_bpid(cls, blueprint_id: int) -> Optional[int]:
+        async with (await get_db_manager()).get_session() as session:
+            stmt = (
+                select(IndustryActivityProducts.productTypeID)
+                .where(IndustryActivityProducts.blueprintTypeID == blueprint_id)
+            )
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
 
     @classmethod
     @async_lru_cache(maxsize=1000)
     async def get_productionmax_by_bpid(cls, blueprint_id: int):
         product_id = cls.get_typeid_by_bpid(blueprint_id)
-        meta = SdeUtils.get_metaname_by_typeid(product_id)
-        cate = SdeUtils.get_category_by_id(product_id)
+        meta = await SdeUtils.get_metaname_by_typeid(product_id)
+        cate = await SdeUtils.get_category_by_id(product_id)
         if meta == 'Faction' and cate == 'Ship':
             return 1
-        return (IndustryBlueprints.select(IndustryBlueprints.maxProductionLimit)
-                                  .where(IndustryBlueprints.blueprintTypeID == blueprint_id).scalar())
+        async with (await get_db_manager()).get_session() as session:
+            stmt = select(IndustryBlueprints.maxProductionLimit).where(IndustryBlueprints.blueprintTypeID == blueprint_id)
+            result = await session.execute(stmt)
+            return result.scalar() or 0
 
     @classmethod
-    async def get_all_product_typeids(cls):
-        return [p.productTypeID for p in IndustryActivityProducts.select(IndustryActivityProducts.productTypeID)]
+    async def get_all_product_typeids(cls) -> List[int]:
+        async with (await get_db_manager()).get_session() as session:
+            stmt = select(IndustryActivityProducts.productTypeID)
+            result = await session.execute(stmt)
+            return [row[0] for row in result]
 
     @classmethod
     async def init_bp_data_to_neo4j(cls):
         product_typeids = await cls.get_all_product_typeids()
-
+        semaphore = asyncio.Semaphore(50)
         # 使用信号量限制并发任务数量，防止连接池耗尽
         async def process_with_semaphore(product_typeid):
-            return await cls.fill_bp_node_and_link_child(product_typeid, finished_set, root=True)
+            async with semaphore:
+                return await cls.fill_bp_node_and_link_child(product_typeid, finished_set, root=True)
 
         finished_set = set()
         await tqdm_manager.add_mission("init_bp_data_to_neo4j", len(product_typeids))
@@ -325,11 +377,11 @@ class BPManager:
             return
         
         type_id = product_typeid
-        type_name = SdeUtils.get_name_by_id(type_id)
-        group_name = SdeUtils.get_groupname_by_id(type_id)
-        category = SdeUtils.get_category_by_id(type_id)
-        meta = SdeUtils.get_metaname_by_typeid(type_id)
-        market_list = SdeUtils.get_market_group_list(type_id)
+        type_name = await SdeUtils.get_name_by_id(type_id)
+        group_name = await SdeUtils.get_groupname_by_id(type_id)
+        category = await SdeUtils.get_category_by_id(type_id)
+        meta = await SdeUtils.get_metaname_by_typeid(type_id)
+        market_list = await SdeUtils.get_market_group_list(type_id)
         activity_id = await cls.get_activity_id_by_product_typeid(type_id)
         bp_type_id = await cls.get_bp_id_by_prod_typeid(type_id)
 
@@ -367,6 +419,10 @@ class BPManager:
                 if f"{type_id}_{material_type_id}" in finished_set:
                     return
                 finished_set.add(f"{type_id}_{material_type_id}")
+                # 安全获取 activity_type，如果 activity_id 为 None 或不在映射中，使用 "Unknown"
+                activity_type = cls.ACTIVITY_ID_MAP.get(activity_id, "Unknown") if activity_id is not None else "Unknown"
+                if activity_id is None:
+                    logger.warning(f"[link_with_semaphore] 产品 {type_id} 的 activity_id 为 None，使用默认 activity_type: Unknown")
                 return await NIU.link_node(
                     "Blueprint",
                     {"type_id": type_id}, {"type_id": type_id},
@@ -374,7 +430,7 @@ class BPManager:
                     {"product": type_id, "material": material_type_id},
                     {"product": type_id, "material": material_type_id,
                     "material_num": quantity, "product_num": product_quantity,
-                    "activity_id": activity_id, "activity_type": cls.ACTIVITY_ID_MAP[activity_id]},
+                    "activity_id": activity_id, "activity_type": activity_type},
                     "Blueprint",
                     {"type_id": material_type_id},
                     {"type_id": material_type_id}
@@ -417,8 +473,8 @@ class BPManager:
             
             # 根据zh参数决定返回英文或中文名称
             if zh:
-                return SdeUtils.get_cn_name_by_id(blueprint_type_id)
+                return await SdeUtils.get_cn_name_by_id(blueprint_type_id)
             else:
-                return SdeUtils.get_name_by_id(blueprint_type_id)
+                return await SdeUtils.get_name_by_id(blueprint_type_id)
         except Exception:
             return None

@@ -1,13 +1,47 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDown, Document } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { useHelpStore } from '@/stores/help'
 import smallSideBar from './components/sideBar/smallSideBar.vue'
-import { computed } from 'vue'
+import HelpDrawer from './components/HelpDrawer.vue'
+import { computed, onMounted, onUnmounted } from 'vue'
+import githubIcon from '@/assets/github-mark.svg'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const helpStore = useHelpStore()
+
+// GitHub 仓库地址
+const GITHUB_REPO_URL = 'https://github.com/AraragiEro/EveKahunaSystem.git'
+
+// 打开 GitHub 仓库
+const openGitHub = () => {
+  window.open(GITHUB_REPO_URL, '_blank')
+}
+
+// 全局快捷键支持（F1 打开文档）
+const handleKeyDown = (event: KeyboardEvent) => {
+  // F1 键打开文档
+  if (event.key === 'F1') {
+    event.preventDefault()
+    helpStore.openHelp()
+  }
+  // Ctrl+H 或 Cmd+H 打开文档
+  if ((event.ctrlKey || event.metaKey) && event.key === 'h') {
+    event.preventDefault()
+    helpStore.openHelp()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
+})
 
 // 定义公开页面列表（不需要认证和主布局）
 const publicPages = ['login', 'forbidden', 'characterAuthClose']
@@ -58,6 +92,25 @@ const handleLogout = () => {
           <div class="header-content">
             <h2>Kahuna-System</h2>
             <div class="header-actions">
+              <!-- GitHub 按钮 -->
+              <el-button
+                @click="openGitHub"
+                title="打开 GitHub 仓库"
+                class="header-action-btn github-btn"
+              >
+                <img :src="githubIcon" alt="GitHub" class="github-icon" />
+                <span class="btn-label">仓库</span>
+              </el-button>
+              
+              <!-- 文档按钮 -->
+              <el-button
+                @click="helpStore.openHelp"
+                title="打开使用说明 (F1)"
+                class="header-action-btn"
+              >
+                <el-icon><Document /></el-icon>
+                <span class="btn-label">指南</span>
+              </el-button>
               
               <!-- 用户信息和退出按钮 -->
               <div class="user-info">
@@ -91,6 +144,9 @@ const handleLogout = () => {
         </el-footer>
       </el-container>
     </el-container>
+    
+    <!-- 全局文档 Drawer -->
+    <HelpDrawer />
   </div>
 </template>
 
@@ -249,6 +305,61 @@ const handleLogout = () => {
 .username {
   color: #64748b;
   font-size: 14px;
+}
+
+.header-action-btn {
+  border: 1px solid #e1e8ed;
+  background: #ffffff;
+  color: #64748b;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.header-action-btn:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+  color: #2c3e50;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.header-action-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.github-btn {
+  padding: 8px 16px;
+}
+
+.github-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.github-btn:hover .github-icon {
+  opacity: 1;
+}
+
+.btn-label {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.header-action-btn :deep(.el-icon) {
+  font-size: 18px;
+  flex-shrink: 0;
 }
 
 /* 优化主内容区域的滚动条样式 */

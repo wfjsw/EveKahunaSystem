@@ -110,6 +110,11 @@ const router = createRouter({
           name: 'permissionManagement',
           component: () => import('../views/admin/permissionManagement.vue'),
         },
+        {
+          path: 'inviteCodeManagement',
+          name: 'inviteCodeManagement',
+          component: () => import('../views/admin/inviteCodeManagement.vue'),
+        },
       ],
     },
     {

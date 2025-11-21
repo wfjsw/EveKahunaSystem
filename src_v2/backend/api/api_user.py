@@ -1,6 +1,6 @@
 from quart import Quart, request, jsonify, g, Blueprint, redirect
 from src_v2.backend.auth import auth_required
-from src.service.log_server import logger
+from src_v2.core.log import logger
 import traceback
 
 from src_v2.core.user.user_manager import UserManager
