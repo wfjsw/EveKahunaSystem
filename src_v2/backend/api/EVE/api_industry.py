@@ -314,7 +314,7 @@ async def delete_industrypermision():
 
 @api_industry_bp.route("/getStructureList", methods=["GET"])
 @auth_required
-@role_required(["vip_alpha"], 402, "仅ALPHA订阅者可拉取真实资产建筑。虚拟建筑可正常使用。")
+# @role_required(["vip_alpha"], 402, "仅ALPHA订阅者可拉取真实资产建筑。虚拟建筑可正常使用。")
 async def get_structure_list():
     user_id = g.current_user["user_id"]
     try:

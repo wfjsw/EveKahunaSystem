@@ -11,12 +11,12 @@ import WorkFlowView from './components/WorkFlowView.vue'
 import MaterialView from './components/MaterialView.vue'
 import FlowView from './components/FlowView.vue'
 import LogisticsView from './components/LogisticsView.vue'
-import { useAuthStore } from '@/stores/auth'
+// import { useAuthStore } from '@/stores/auth'
 
-const authStore = useAuthStore()
-const haveAlphaRole = computed(() => {
-    return authStore.user?.roles.includes('vip_alpha') || false
-})
+// const authStore = useAuthStore()
+// const haveAlphaRole = computed(() => {
+//     return authStore.user?.roles.includes('vip_alpha') || false
+// })
 
 // localStorage key 前缀
 const STORAGE_KEY_PREFIX = 'plan_calculate_result_'
@@ -29,7 +29,7 @@ const getPlanList = async () => {
     const res = await http.post('/EVE/industry/getPlanTableData')
     const data = await res.json()
     planList.value = data.data
-    
+
     // 如果计划列表加载完成，尝试恢复之前选择的计划
     if (planList.value.length > 0 && !selectedPlan.value) {
         restoreSelectedPlan()
@@ -131,20 +131,20 @@ const getPlanCalculateResultTableViewStart = async () => {
                 operate_type: "start"
             }
         )
-        
+
         // 检查 HTTP 响应状态
         if (!res.ok) {
             ElMessage.error(`请求失败: HTTP ${res.status}`)
             return
         }
-        
+
         const data = await res.json()
-        
+
         if (data.status !== 200) {
             ElMessage.error(data.message || "启动计算失败")
             return
         }
-        
+
         // 设置计算状态
         isCalculating.value = true
         calculationStatus.value = 'pending'
@@ -152,10 +152,10 @@ const getPlanCalculateResultTableViewStart = async () => {
         currentStepName.value = ''
         currentStepProgress.value = 0
         calculationError.value = null
-        
+
         // 启动状态轮询
         startStatusPolling()
-        
+
         ElMessage.success("计算任务已启动")
     } catch (error) {
         console.error("getPlanCalculateResultTableViewStart error:", error)
@@ -175,37 +175,37 @@ const getPlanCalculateResultTableViewStatus = async (showCompletedMessage: boole
                 operate_type: "status"
             }
         )
-        
+
         if (!res.ok) {
             return
         }
-        
+
         const data = await res.json()
-        
+
         if (data.status !== 200) {
             return
         }
-        
+
         const statusData = data.data || {}
         calculationStatus.value = statusData.status || 'idle'
         calculationProgress.value = statusData.total_progress || 0
-        
+
         // 更新当前步骤信息
         if (statusData.current_step) {
             currentStepName.value = statusData.current_step.name || ''
             currentStepProgress.value = statusData.current_step.progress || 0
             // 处理 is_indeterminate：支持布尔值、字符串 '1'/'0'、字符串 'true'/'false'
             const isIndeterminate = statusData.current_step.is_indeterminate
-            currentStepProgressIndeterminate.value = isIndeterminate === true || 
-                isIndeterminate === '1' || 
-                isIndeterminate === 'true' || 
+            currentStepProgressIndeterminate.value = isIndeterminate === true ||
+                isIndeterminate === '1' ||
+                isIndeterminate === 'true' ||
                 isIndeterminate === 1
         } else {
             currentStepName.value = ''
             currentStepProgress.value = 0
             currentStepProgressIndeterminate.value = true
         }
-        
+
         // 如果状态为失败，显示错误信息
         if (statusData.status === 'failed') {
             calculationError.value = statusData.error || '计算失败'
@@ -242,20 +242,20 @@ const getPlanCalculateResultTableViewResult = async (showMessage: boolean = true
                 operate_type: "result"
             }
         )
-        
+
         // 检查 HTTP 响应状态
         if (!res.ok) {
             ElMessage.error(`请求失败: HTTP ${res.status}`)
             return
         }
-        
+
         const data = await res.json()
-        
+
         if (data.status !== 200) {
             ElMessage.error(data.message || "获取数据失败")
             return
         }
-        
+
         // 先清空数据，避免数据错位
         PlanCalculateResultTableView.value = []
         PlanCalculateMaterialTableView.value = []
@@ -296,10 +296,10 @@ const startStatusPolling = () => {
     if (statusPollingInterval !== null) {
         clearInterval(statusPollingInterval)
     }
-    
+
     // 立即查询一次状态
     getPlanCalculateResultTableViewStatus()
-    
+
     // 每2秒轮询一次状态
     statusPollingInterval = window.setInterval(() => {
         getPlanCalculateResultTableViewStatus()
@@ -318,7 +318,7 @@ const stopStatusPolling = () => {
 watch(selectedPlan, (newPlan) => {
     // 保存选中的计划到本地
     saveSelectedPlan(newPlan)
-    
+
     // 停止之前的轮询
     stopStatusPolling()
     isCalculating.value = false
@@ -327,7 +327,7 @@ watch(selectedPlan, (newPlan) => {
     currentStepName.value = ''
     currentStepProgress.value = 0
     calculationError.value = null
-    
+
     if (newPlan) {
         const localDataFlow = loadFromLocal(newPlan, "flow")
         const localDataMaterial = loadFromLocal(newPlan, "material")
@@ -392,7 +392,7 @@ const checkCalculationStatus = async () => {
 onMounted(async () => {
     // 加载计划列表（加载完成后会自动恢复选中的计划）
     await getPlanList()
-    
+
     // 计划列表加载完成后，如果有选中的计划，尝试从本地加载数据
     if (selectedPlan.value) {
         const localData = loadFromLocal(selectedPlan.value, "flow")
@@ -457,12 +457,12 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
                         />
                     </div>
                 </el-col>
-                
+
                 <!-- 操作按钮区域 -->
                 <el-col :span="4">
                     <div class="control-item">
-                        <el-button 
-                            type="primary" 
+                        <el-button
+                            type="primary"
                             :icon="calculationStatus === 'running' ? Loading : Refresh"
                             :loading="calculationStatus === 'running' || calculationStatus === 'pending'"
                             @click="getPlanCalculateResultTableViewStart"
@@ -473,7 +473,7 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
                         </el-button>
                     </div>
                 </el-col>
-                
+
                 <!-- 进度显示区域 -->
                 <el-col :span="14">
                     <div class="progress-container">
@@ -481,7 +481,7 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
                         <div class="progress-item">
                             <div class="progress-header">
                                 <div class="progress-label">
-                                    <el-icon 
+                                    <el-icon
                                         class="status-icon"
                                         :class="{
                                             'icon-idle': calculationStatus === 'idle',
@@ -506,8 +506,8 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
                                     <template v-else-if="calculationStatus === 'failed'">计算失败</template>
                                 </span>
                             </div>
-                            <el-progress 
-                                :percentage="calculationProgress" 
+                            <el-progress
+                                :percentage="calculationProgress"
                                 :status="calculationStatus === 'completed' ? 'success' : calculationStatus === 'failed' ? 'exception' : undefined"
                                 :stroke-width="12"
                                 :show-text="false"
@@ -518,7 +518,7 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
                                 color=#409EFF
                             />
                         </div>
-                        
+
                         <!-- 当前步骤进度 -->
                         <div v-if="calculationStatus === 'running' && currentStepName" class="progress-item step-progress">
                             <div class="progress-header">
@@ -531,8 +531,8 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
                                     <template v-else>{{ currentStepProgress }}%</template>
                                 </span>
                             </div>
-                            <el-progress 
-                                :percentage="currentStepProgressIndeterminate ? 50 : currentStepProgress" 
+                            <el-progress
+                                :percentage="currentStepProgressIndeterminate ? 50 : currentStepProgress"
                                 :stroke-width="10"
                                 :show-text="false"
                                 color="#409EFF"
@@ -541,11 +541,11 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
                                 :striped="!currentStepProgressIndeterminate"
                                 :striped-flow="!currentStepProgressIndeterminate"
                                 :duration="3"
-                                
+
                             />
                             <div class="step-name">{{ currentStepName }}</div>
                         </div>
-                        
+
                         <!-- 错误信息 -->
                         <div v-if="calculationStatus === 'failed' && calculationError" class="error-message">
                             <el-icon><Close /></el-icon>
@@ -560,22 +560,22 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
         <el-row>
         <el-tabs style="width: 100%;">
             <el-tab-pane label="流程视图">
-                <FlowView 
+                <FlowView
                     :flow-data="PlanCalculateResultTableView"
                     :selected-plan="selectedPlan"
                 />
             </el-tab-pane>
-            
+
             <el-tab-pane label="材料视图">
-                <MaterialView 
+                <MaterialView
                     :material-data="PlanCalculateMaterialTableView"
                     :selected-plan="selectedPlan"
                 />
             </el-tab-pane>
-            
+
             <!-- 工作流视图 -->
             <el-tab-pane label="工作流">
-                <WorkFlowView 
+                <WorkFlowView
                     :work-flow-data="PlanCalculateWorkFlowTableView"
                     :selected-plan="selectedPlan"
                 />
@@ -583,24 +583,24 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
 
             <!-- 采购视图 -->
             <el-tab-pane label="采购视图">
-                <PurchaseView 
+                <PurchaseView
                     :material-data="PlanCalculateMaterialTableView"
                     :selected-plan="selectedPlan"
                 />
             </el-tab-pane>
-            
-            <el-tab-pane label="成本视图" :disabled="!haveAlphaRole">
-                <CostView 
+
+            <el-tab-pane label="成本视图">
+                <CostView
                     :-plan-calculate-e-i-v-cost-table-view="PlanCalculateEIVCostTableView"
                 />
             </el-tab-pane>
-            
-            <el-tab-pane label="劳动力视图" :disabled="!haveAlphaRole">
+
+            <el-tab-pane label="劳动力视图">
                 <LaborView :running-jobs="PlanCalculateRunningJobTableView" />
             </el-tab-pane>
 
-            <el-tab-pane label="物流视图" :disabled="!haveAlphaRole">
-                <LogisticsView 
+            <el-tab-pane label="物流视图">
+                <LogisticsView
                     :logistics-data="PlanCalculateLogisticsTableView"
                     :selected-plan="selectedPlan"
                 />

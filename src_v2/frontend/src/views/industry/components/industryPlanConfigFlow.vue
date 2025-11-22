@@ -4,18 +4,18 @@ import { http } from '@/http'
 import IndustryPlanConfigFlowTable from './industryPlanConfigFlowTable.vue'
 import { ElMessage } from 'element-plus'
 import { VueDraggable } from 'vue-draggable-plus'
-import { haveRole } from '@/router/guards'
-import { useAuthStore } from '@/stores/auth'
+// import { haveRole } from '@/router/guards'
+// import { useAuthStore } from '@/stores/auth'
 
-const authStore = useAuthStore()
+// const authStore = useAuthStore()
 interface Props {
     selectedPlan: string
 }
 
-const haveAlphaRole = computed(() => {
-    console.log("roles", authStore.user?.roles)
-    return authStore.user?.roles.includes('vip_alpha') || false
-})
+// const haveAlphaRole = computed(() => {
+//     console.log("roles", authStore.user?.roles)
+//     return authStore.user?.roles.includes('vip_alpha') || false
+// })
 
 const configTypeMap = ref<{ [key: string]: string }>({
   "StructureRigConfig": "建筑插件",
@@ -245,7 +245,7 @@ const createConfig = async () => {
         ElMessage.error("未找到对应的配置类型")
         return
     }
-    
+
     console.log("config_value", config_value)
     const res = await http.post('/EVE/industry/createConfigFlowConfig', {
         config_type: createConfigType.value,
@@ -324,7 +324,7 @@ const group_keyword_type = ref('')
 const before_fetch_group_suggestions = (keyword_type: string) => {
     console.log("before_fetch_group_suggestions keyword_type", keyword_type)
     group_keyword_type.value = keyword_type
-    
+
 }
 
 interface TypeItem {
@@ -412,7 +412,7 @@ const fetchContainerPermissionSuggestions = async (queryString: string, cb: (sug
     const data = await res.json()
     console.log("fetchContainerPermissionSuggestions data", data)
     ContainerPermissionSuggestions.value = data.data
-    
+
     const results = queryString
     ? ContainerPermissionSuggestions.value.filter(StructureContainerPermissionCreateFilter(queryString))
     : ContainerPermissionSuggestions.value
@@ -532,7 +532,7 @@ watch(
 </VueDraggable>
 </div>
 
-<el-drawer 
+<el-drawer
     v-model="configFlowManagementVisible"
     resizable
     size="1000px"
@@ -599,7 +599,7 @@ watch(
             <el-radio-button label="建筑分配" value="StructureAssignConf" />
             <el-radio-button label="原材料标记" value="MaterialTagConf" />
             <el-radio-button label="缺省蓝图参数" value="DefaultBlueprintConf" />
-            <el-radio-button label="载入库存" value="LoadAssetConf" :disabled="!haveAlphaRole"/>
+            <el-radio-button label="载入库存" value="LoadAssetConf"/>
             <el-radio-button label="最大作业拆分控制" value="MaxJobSplitCountConf" />
         </el-radio-group>
 
@@ -690,7 +690,7 @@ watch(
                 增加组
             </el-button>
         </el-form>
-        
+
         <!-- 缺省蓝图参数配置 -->
         <el-form :model="configForm.DefaultBlueprintConf" label-width="120px" v-else-if="createConfigType === 'DefaultBlueprintConf'">
             <el-card v-for="group in configForm.DefaultBlueprintConf.keyword_groups" :key="group.index">
@@ -728,7 +728,7 @@ watch(
                 <el-input-number v-model="configForm.DefaultBlueprintConf.mater_eff" placeholder="请输入材料效率" :min="0" :max="10" />
             </el-form-item>
         </el-form>
-        
+
         <!-- 载入库存配置 -->
         <el-form :model="configForm.LoadAssetConf" label-width="120px" v-else-if="createConfigType === 'LoadAssetConf'">
             <el-form-item label="选择库存许可">

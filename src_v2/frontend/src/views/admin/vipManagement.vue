@@ -47,7 +47,7 @@ const filteredVipStates = computed(() => {
     return vipStates.value
   }
   const searchTerm = searchUserName.value.trim().toLowerCase()
-  return vipStates.value.filter(state => 
+  return vipStates.value.filter(state =>
     state.userName.toLowerCase().includes(searchTerm)
   )
 })
@@ -84,10 +84,10 @@ const handleEdit = (vipState: VipState) => {
 // 保存编辑
 const handleSave = async () => {
   if (!editFormRef.value || !editingVipState.value) return
-  
+
   try {
     await editFormRef.value.validate()
-    
+
     const response = await http.put(
       `/vip/${encodeURIComponent(editingVipState.value.userName)}`,
       {
@@ -95,7 +95,7 @@ const handleSave = async () => {
         vipEndDate: editForm.value.vipEndDate || null
       }
     )
-    
+
     if (response.ok) {
       ElMessage.success('更新成功')
       editDialogVisible.value = false
@@ -137,7 +137,7 @@ const searchUsers = async (queryString: string, callback: (results: UserOption[]
     callback([])
     return
   }
-  
+
   try {
     userSearchLoading.value = true
     const response = await http.get(`/vip/search-users?query=${encodeURIComponent(queryString)}&limit=20`)
@@ -170,15 +170,15 @@ const handleAdd = () => {
 // 保存添加的会员
 const handleAddSave = async () => {
   if (!addFormRef.value) return
-  
+
   try {
     await addFormRef.value.validate()
-    
+
     if (!addForm.value.userName || !addForm.value.userName.trim()) {
       ElMessage.error('请输入用户名')
       return
     }
-    
+
     const response = await http.put(
       `/vip/${encodeURIComponent(addForm.value.userName.trim())}`,
       {
@@ -186,7 +186,7 @@ const handleAddSave = async () => {
         vipEndDate: addForm.value.vipEndDate || null
       }
     )
-    
+
     if (response.ok) {
       ElMessage.success('添加成功')
       addDialogVisible.value = false
@@ -237,27 +237,27 @@ onMounted(() => {
       style="width: 100%"
     >
       <el-table-column prop="userName" label="用户名" width="200" />
-      <el-table-column prop="vipLevel" label="VIP等级" width="150">
+      <!-- <el-table-column prop="vipLevel" label="VIP等级" width="150">
         <template #default="{ row }">
           <el-tag :type="row.vipLevel === 'vip_alpha' ? 'success' : 'warning'">
             {{ row.vipLevel === 'vip_alpha' ? 'VIP Alpha' : row.vipLevel === 'vip_omega' ? 'VIP Omega' : row.vipLevel || '-' }}
           </el-tag>
         </template>
-      </el-table-column>
-      <el-table-column prop="vipEndDate" label="到期时间" width="200">
+      </el-table-column> -->
+      <!-- <el-table-column prop="vipEndDate" label="到期时间" width="200">
         <template #default="{ row }">
           <span :class="{ 'expired-text': isExpired(row.vipEndDate) }">
             {{ formatDateTime(row.vipEndDate) }}
           </span>
         </template>
-      </el-table-column>
-      <el-table-column label="状态" width="120">
+      </el-table-column> -->
+      <!-- <el-table-column label="状态" width="120">
         <template #default="{ row }">
           <el-tag :type="isExpired(row.vipEndDate) ? 'danger' : 'success'">
             {{ isExpired(row.vipEndDate) ? '已过期' : '有效' }}
           </el-tag>
         </template>
-      </el-table-column>
+      </el-table-column> -->
       <el-table-column label="操作" width="120">
         <template #default="{ row }">
           <el-button

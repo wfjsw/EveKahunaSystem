@@ -6,12 +6,12 @@ import { http } from '@/http'
 import { VueDraggable } from 'vue-draggable-plus'
 import IndustryPlanPlanTable from './components/industryPlanPlanTable.vue'
 import IndustryPlanConfigFlow from './components/industryPlanConfigFlow.vue'
-import { useAuthStore } from '@/stores/auth'
+// import { useAuthStore } from '@/stores/auth'
 
-const authStore = useAuthStore()
-const haveAlphaRole = computed(() => {
-    return authStore.user?.roles.includes('vip_alpha') || false
-})
+// const authStore = useAuthStore()
+// const haveAlphaRole = computed(() => {
+//     return authStore.user?.roles.includes('vip_alpha') || false
+// })
 
 interface PlanProductTableData {
   "row_id": number,
@@ -73,7 +73,7 @@ const getPlanTableData = async () => {
   const res = await http.post('/EVE/industry/getPlanTableData')
   const data = await res.json()
   IndustryPlanTableData.value = data.data
-  
+
   // 如果从 localStorage 恢复了计划，但计划列表中不存在，则清除
   if (selectedPlan.value) {
     const planExists = IndustryPlanTableData.value.some(item => item.plan_name === selectedPlan.value)
@@ -84,7 +84,7 @@ const getPlanTableData = async () => {
       console.log("selectedPlan not found", selectedPlan.value)
       return
     }
-    
+
     // 加载计划数据
     currentPlanProducts.value = IndustryPlanTableData.value.find(item => item.plan_name == selectedPlan.value)?.products || []
     current_plan_settings.value = IndustryPlanTableData.value.find(item => item.plan_name == selectedPlan.value)?.plan_settings || {
@@ -171,7 +171,7 @@ const addPlanDialogForm = ref({
   plan_list: [] as PlanTableData[],
 
   add_plan_loading: false,
-  
+
   plan_name: '',
   type_id: '',
   quantity: 1
@@ -186,17 +186,17 @@ const handleRowContextMenu = (row: any, column: any, event: MouseEvent) => {
   if (!('can_add_plan' in row)) {
     return
   }
-  
+
   event.preventDefault()
   event.stopPropagation()
-  
+
   contextMenuRow.value = row
   contextMenuStyle.value = {
     left: event.clientX + 'px',
     top: event.clientY + 'px'
   }
   contextMenuVisible.value = true
-  
+
   // 添加点击外部关闭菜单的事件监听（使用 nextTick 确保菜单已渲染）
   nextTick(() => {
     document.addEventListener('click', handleClickOutside, { once: true })
@@ -257,7 +257,7 @@ const getMarketGroupList = (marketGroupStr: string): string[] => {
 const copyToClipboard = async (text: string | number, label?: string) => {
   const textStr = String(text || '').trim()
   if (!textStr || textStr === '—' || textStr === '') return
-  
+
   try {
     await navigator.clipboard.writeText(textStr)
     ElMessage.success({
@@ -306,7 +306,7 @@ const handleItemInfo = async () => {
     ElMessage.error(data.message)
     return
   }
-  
+
   ItemInfoDialogLoading.value = false
   ItemData.value.type_id = data.data.type_id
   ItemData.value.type_name = data.data.type_name
@@ -479,7 +479,7 @@ onMounted(() => {
                 </template>
               </el-table-column>
             </el-table>
-            
+
             <!-- 右键菜单 -->
             <div
               v-if="contextMenuVisible"
@@ -564,7 +564,7 @@ onMounted(() => {
           :loading="addPlanDialogForm.get_plan_loading"
           placeholder="请选择计划"
         >
-          <el-option 
+          <el-option
             v-for="item in addPlanDialogForm.plan_list"
             :key="item.plan_name"
             :label="item.plan_name"
@@ -597,24 +597,24 @@ onMounted(() => {
       <!-- 物品标题区域 -->
       <div class="item-header">
         <div class="item-title-section">
-          <h3 
-            class="item-name-zh copyable" 
+          <h3
+            class="item-name-zh copyable"
             @click="copyToClipboard(ItemData.type_name_zh || ItemData.type_name, '中文名称')"
             :title="ItemData.type_name_zh || ItemData.type_name ? '点击复制' : ''"
           >
             {{ ItemData.type_name_zh || ItemData.type_name || '未知物品' }}
           </h3>
-          <p 
-            class="item-name-en copyable" 
+          <p
+            class="item-name-en copyable"
             @click="copyToClipboard(ItemData.type_name, '英文名称')"
             :title="ItemData.type_name ? '点击复制' : ''"
           >
             {{ ItemData.type_name }}
           </p>
         </div>
-        <el-tag 
-          v-if="ItemData.type_id" 
-          type="info" 
+        <el-tag
+          v-if="ItemData.type_id"
+          type="info"
           class="item-id-tag copyable"
           @click="copyToClipboard(String(ItemData.type_id), '物品ID')"
           title="点击复制ID"
@@ -624,16 +624,16 @@ onMounted(() => {
       </div>
 
       <!-- 详细信息区域 -->
-      <el-descriptions 
-        :column="1" 
-        border 
+      <el-descriptions
+        :column="1"
+        border
         class="item-descriptions"
         :label-style="{ width: '120px', fontWeight: '600', color: '#606266' }"
         :content-style="{ color: '#303133' }"
       >
         <el-descriptions-item label="物品ID">
-          <span 
-            class="item-value copyable" 
+          <span
+            class="item-value copyable"
             @click="copyToClipboard(String(ItemData.type_id), '物品ID')"
             :title="ItemData.type_id ? '点击复制' : ''"
           >
@@ -641,8 +641,8 @@ onMounted(() => {
           </span>
         </el-descriptions-item>
         <el-descriptions-item label="物品名称">
-          <span 
-            class="item-value copyable" 
+          <span
+            class="item-value copyable"
             @click="copyToClipboard(ItemData.type_name, '物品名称')"
             :title="ItemData.type_name ? '点击复制' : ''"
           >
@@ -650,8 +650,8 @@ onMounted(() => {
           </span>
         </el-descriptions-item>
         <el-descriptions-item label="中文名称">
-          <span 
-            class="item-value highlight copyable" 
+          <span
+            class="item-value highlight copyable"
             @click="copyToClipboard(ItemData.type_name_zh, '中文名称')"
             :title="ItemData.type_name_zh ? '点击复制' : ''"
           >
@@ -659,8 +659,8 @@ onMounted(() => {
           </span>
         </el-descriptions-item>
         <el-descriptions-item label="Meta等级">
-          <span 
-            v-if="ItemData.meta" 
+          <span
+            v-if="ItemData.meta"
             :class="['meta-level', `meta-level-${getMetaLevelClass(ItemData.meta)}`, 'copyable']"
             @click="copyToClipboard(ItemData.meta, 'Meta等级')"
             title="点击复制"
@@ -670,8 +670,8 @@ onMounted(() => {
           <span v-else class="item-value">—</span>
         </el-descriptions-item>
         <el-descriptions-item label="物品组">
-          <span 
-            class="item-value copyable" 
+          <span
+            class="item-value copyable"
             @click="copyToClipboard(ItemData.group, '物品组')"
             :title="ItemData.group ? '点击复制' : ''"
           >
@@ -681,8 +681,8 @@ onMounted(() => {
         <el-descriptions-item label="市场组">
           <div v-if="ItemData.market_group_list" class="market-group-chain">
             <template v-for="(group, index) in getMarketGroupList(ItemData.market_group_list)" :key="index">
-              <span 
-                class="market-group-text copyable" 
+              <span
+                class="market-group-text copyable"
                 @click="copyToClipboard(group, '市场组')"
                 title="点击复制此节点"
               >
@@ -697,14 +697,14 @@ onMounted(() => {
         </el-descriptions-item>
       </el-descriptions>
     </div>
-    
+
     <template #footer>
       <div class="dialog-footer">
         <el-button @click="cancelItemInfoDialog">关闭</el-button>
       </div>
     </template>
   </el-dialog>
-  
+
   <!-- 新建计划弹窗 -->
   <el-dialog
     v-model="dialogVisible"
@@ -716,25 +716,25 @@ onMounted(() => {
       <el-form-item label="计划名称">
         <el-input v-model="planForm.name" placeholder="请输入计划名称" />
       </el-form-item>
-      
+
       <el-form-item label="是否考虑库存">
-        <el-switch v-model="planForm.considerate_asset" :disabled="!haveAlphaRole" />
+        <el-switch v-model="planForm.considerate_asset" />
       </el-form-item>
-      
+
       <el-form-item label="是否考虑运行中任务">
-        <el-switch v-model="planForm.considerate_running_job" :disabled="!haveAlphaRole" />
+        <el-switch v-model="planForm.considerate_running_job" />
       </el-form-item>
-      
+
       <el-form-item label="是否按照习惯切分工作流">
         <el-switch v-model="planForm.split_to_jobs" />
       </el-form-item>
-      
+
       <el-form-item label="是否考虑库存蓝图">
-        <el-switch v-model="planForm.considerate_bp_relation" :disabled="!haveAlphaRole"/>
+        <el-switch v-model="planForm.considerate_bp_relation" />
       </el-form-item>
-      
+
       <el-form-item label="蓝图拷贝完全使用">
-        <el-switch v-model="current_plan_settings.full_use_bp_cp" :disabled="!haveAlphaRole" />
+        <el-switch v-model="current_plan_settings.full_use_bp_cp" />
       </el-form-item>
 
       <el-form-item label="工作安排方式">
@@ -744,7 +744,7 @@ onMounted(() => {
         </el-radio-group>
       </el-form-item>
     </el-form>
-    
+
     <template #footer>
       <span class="dialog-footer">
         <el-button @click="handleCancel">取消</el-button>
@@ -764,19 +764,19 @@ onMounted(() => {
       <el-form-item label="计划名称">
         <el-input v-model="current_plan_settings.name" placeholder="请输入计划名称" disabled/>
       </el-form-item>
-      
+
       <el-form-item label="是否考虑库存">
-        <el-switch v-model="current_plan_settings.considerate_asset" :disabled="!haveAlphaRole" />
+        <el-switch v-model="current_plan_settings.considerate_asset" />
       </el-form-item>
-      
+
       <el-form-item label="是否考虑运行中任务">
-        <el-switch v-model="current_plan_settings.considerate_running_job" :disabled="!haveAlphaRole" />
+        <el-switch v-model="current_plan_settings.considerate_running_job" />
       </el-form-item>
-      
+
       <el-form-item label="是否按照习惯切分工作流">
         <el-switch v-model="current_plan_settings.split_to_jobs" />
       </el-form-item>
-      
+
       <el-form-item label="是否考虑库存蓝图">
         <el-switch v-model="current_plan_settings.considerate_bp_relation" :disabled="!haveAlphaRole" />
       </el-form-item>
@@ -784,7 +784,7 @@ onMounted(() => {
       <el-form-item label="蓝图拷贝完全使用">
         <el-switch v-model="current_plan_settings.full_use_bp_cp" :disabled="!haveAlphaRole" />
       </el-form-item>
-      
+
       <el-form-item label="工作安排方式">
         <el-radio-group v-model="current_plan_settings.work_type">
           <el-radio label="whole">按整体考虑</el-radio>
@@ -792,7 +792,7 @@ onMounted(() => {
         </el-radio-group>
       </el-form-item>
     </el-form>
-    
+
     <template #footer>
       <span class="dialog-footer">
         <el-button @click="cancelModifyPlan">取消</el-button>
