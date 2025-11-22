@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Edit, Search } from '@element-plus/icons-vue'
+import { Edit, Search, Plus } from '@element-plus/icons-vue'
 import { http } from '@/http'
 
 interface VipState {
@@ -10,17 +10,31 @@ interface VipState {
   vipEndDate: string
 }
 
+interface UserOption {
+  userName: string
+}
+
 const vipStates = ref<VipState[]>([])
 const loading = ref(false)
 const editDialogVisible = ref(false)
+const addDialogVisible = ref(false)
 const editingVipState = ref<VipState | null>(null)
 const searchUserName = ref('')
+const userOptions = ref<UserOption[]>([])
+const userSearchLoading = ref(false)
 
 const editForm = ref({
   vipLevel: '',
   vipEndDate: ''
 })
 const editFormRef = ref()
+
+const addForm = ref({
+  userName: '',
+  vipLevel: '',
+  vipEndDate: ''
+})
+const addFormRef = ref()
 
 const vipLevelOptions = [
   { label: 'VIP Alpha', value: 'vip_alpha' },
@@ -117,6 +131,77 @@ const isExpired = (dateStr: string) => {
   }
 }
 
+// 搜索用户（用于自动补全）
+const searchUsers = async (queryString: string, callback: (results: UserOption[]) => void) => {
+  if (!queryString || queryString.trim().length < 1) {
+    callback([])
+    return
+  }
+  
+  try {
+    userSearchLoading.value = true
+    const response = await http.get(`/vip/search-users?query=${encodeURIComponent(queryString)}&limit=20`)
+    if (response.ok) {
+      const data = await response.json()
+      const results = data.data || []
+      callback(results)
+    } else {
+      callback([])
+    }
+  } catch (error: any) {
+    // 静默失败，不影响用户体验
+    callback([])
+  } finally {
+    userSearchLoading.value = false
+  }
+}
+
+// 打开添加会员对话框
+const handleAdd = () => {
+  addForm.value = {
+    userName: '',
+    vipLevel: '',
+    vipEndDate: ''
+  }
+  userOptions.value = []
+  addDialogVisible.value = true
+}
+
+// 保存添加的会员
+const handleAddSave = async () => {
+  if (!addFormRef.value) return
+  
+  try {
+    await addFormRef.value.validate()
+    
+    if (!addForm.value.userName || !addForm.value.userName.trim()) {
+      ElMessage.error('请输入用户名')
+      return
+    }
+    
+    const response = await http.put(
+      `/vip/${encodeURIComponent(addForm.value.userName.trim())}`,
+      {
+        vipLevel: addForm.value.vipLevel || null,
+        vipEndDate: addForm.value.vipEndDate || null
+      }
+    )
+    
+    if (response.ok) {
+      ElMessage.success('添加成功')
+      addDialogVisible.value = false
+      loadVipStates()
+    } else {
+      const error = await response.json()
+      ElMessage.error(error.message || '添加失败')
+    }
+  } catch (error: any) {
+    if (error?.message && !error.message.includes('validate')) {
+      ElMessage.error(error.message || '添加失败')
+    }
+  }
+}
+
 onMounted(() => {
   loadVipStates()
 })
@@ -126,6 +211,10 @@ onMounted(() => {
   <div class="vip-management">
     <div class="header">
       <h2>会员管理</h2>
+      <el-button type="primary" @click="handleAdd">
+        <el-icon><Plus /></el-icon>
+        添加会员
+      </el-button>
     </div>
 
     <div class="filter-section">
@@ -238,6 +327,85 @@ onMounted(() => {
       <template #footer>
         <el-button @click="editDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSave">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 添加会员对话框 -->
+    <el-dialog
+      v-model="addDialogVisible"
+      title="添加会员"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="addFormRef"
+        :model="addForm"
+        label-width="100px"
+      >
+        <el-form-item
+          label="用户名"
+          prop="userName"
+          :rules="[
+            { required: true, message: '请输入用户名', trigger: 'blur' }
+          ]"
+        >
+          <el-autocomplete
+            v-model="addForm.userName"
+            :fetch-suggestions="searchUsers"
+            placeholder="请输入用户名进行搜索"
+            style="width: 100%"
+            :loading="userSearchLoading"
+            clearable
+            value-key="userName"
+            @select="(item: UserOption) => { addForm.userName = item.userName }"
+          >
+            <template #default="{ item }">
+              <div>{{ item.userName }}</div>
+            </template>
+          </el-autocomplete>
+        </el-form-item>
+        <el-form-item
+          label="VIP等级"
+          prop="vipLevel"
+          :rules="[
+            { required: false, message: '请选择VIP等级', trigger: 'change' }
+          ]"
+        >
+          <el-select
+            v-model="addForm.vipLevel"
+            placeholder="请选择VIP等级"
+            style="width: 100%"
+            clearable
+          >
+            <el-option
+              v-for="option in vipLevelOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item
+          label="到期时间"
+          prop="vipEndDate"
+          :rules="[
+            { required: false, message: '请选择到期时间', trigger: 'change' }
+          ]"
+        >
+          <el-date-picker
+            v-model="addForm.vipEndDate"
+            type="datetime"
+            placeholder="请选择到期时间"
+            style="width: 100%"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            clearable
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="addDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleAddSave">添加</el-button>
       </template>
     </el-dialog>
   </div>

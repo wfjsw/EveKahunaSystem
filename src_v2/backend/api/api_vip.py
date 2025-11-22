@@ -4,7 +4,9 @@ from src_v2.backend.api.permission_required import permission_required
 from src_v2.core.log import logger
 import traceback
 from src_v2.core.utils import KahunaException
-from src_v2.core.database.kahuna_database_utils_v2 import VipStateDBUtils
+from src_v2.core.database.kahuna_database_utils_v2 import VipStateDBUtils, UserDBUtils
+from src_v2.core.database.connect_manager import postgres_manager as dbm
+from sqlalchemy import select
 from datetime import datetime
 
 api_vip_bp = Blueprint('api_vip', __name__, url_prefix='/api/vip')
@@ -86,4 +88,36 @@ async def update_vip_state(user_name: str):
     except Exception as e:
         logger.error(f"更新VIP状态失败: {traceback.format_exc()}")
         return jsonify({"status": 500, "message": "更新VIP状态失败"}), 500
+
+
+@api_vip_bp.route("/search-users", methods=["GET"])
+@auth_required
+@permission_required(["admin:read"])
+async def search_users():
+    """搜索用户（用于自动补全）"""
+    try:
+        query = request.args.get('query', '').strip()
+        limit = int(request.args.get('limit', 20))
+        
+        if not query:
+            return jsonify({"status": 200, "data": []})
+        
+        users = []
+        async with dbm.get_session() as session:
+            # 使用LIKE进行模糊搜索
+            stmt = select(UserDBUtils.cls_model).where(
+                UserDBUtils.cls_model.user_name.ilike(f'%{query}%')
+            ).limit(limit)
+            result = await session.execute(stmt)
+            for user in result.scalars():
+                users.append({
+                    "userName": user.user_name
+                })
+        
+        return jsonify({"status": 200, "data": users})
+    except KahunaException as e:
+        return jsonify({"status": 500, "message": str(e)}), 500
+    except Exception as e:
+        logger.error(f"搜索用户失败: {traceback.format_exc()}")
+        return jsonify({"status": 500, "message": "搜索用户失败"}), 500
 
