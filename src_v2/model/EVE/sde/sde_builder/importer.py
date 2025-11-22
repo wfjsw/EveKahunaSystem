@@ -384,8 +384,6 @@ class SDEImporter:
         Returns:
             导入的记录数
         """
-        import json
-        
         logger.info(f"使用特殊处理导入 InvTypes 表: {file_path}")
         
         table_name = 'invTypes'
@@ -456,8 +454,6 @@ class SDEImporter:
         Returns:
             导入的总记录数（4个表的总和）
         """
-        import json
-        
         logger.info(f"使用特殊处理导入蓝图表: {file_path}")
         
         # 检查文件是否存在
@@ -632,8 +628,6 @@ class SDEImporter:
         Returns:
             导入的记录数
         """
-        import json
-        
         logger.info(f"使用特殊处理导入 MetaGroups 表: {file_path}")
         
         table_name = 'metaGroups'
@@ -702,8 +696,6 @@ class SDEImporter:
         Returns:
             导入的记录数
         """
-        import json
-        
         logger.info(f"使用特殊处理导入 InvGroups 表: {file_path}")
         
         table_name = 'invGroups'
@@ -772,8 +764,6 @@ class SDEImporter:
         Returns:
             导入的记录数
         """
-        import json
-        
         logger.info(f"使用特殊处理导入 InvCategories 表: {file_path}")
         
         table_name = 'invCategories'
@@ -841,8 +831,6 @@ class SDEImporter:
         Returns:
             导入的记录数
         """
-        import json
-        
         logger.info(f"使用特殊处理导入 MarketGroups 表: {file_path}")
         
         table_name = 'marketGroups'
@@ -911,8 +899,6 @@ class SDEImporter:
         Returns:
             导入的记录数
         """
-        import json
-        
         logger.info(f"使用特殊处理导入 MapSolarSystems 表: {file_path}")
         
         table_name = 'mapSolarSystems'
@@ -982,8 +968,6 @@ class SDEImporter:
         Returns:
             导入的记录数
         """
-        import json
-        
         logger.info(f"使用特殊处理导入 MapRegions 表: {file_path}")
         
         table_name = 'mapRegions'

@@ -32,7 +32,6 @@ from .cache_model import (
 )
 from .model import (
     User,
-    InvitCode,
     EveAuthedCharacter,
     EveAliasCharacter
 )

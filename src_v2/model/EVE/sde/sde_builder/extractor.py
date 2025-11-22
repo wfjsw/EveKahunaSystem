@@ -5,6 +5,7 @@ SDE 解压模块
 import os
 import zipfile
 from typing import Optional
+import shutil
 
 from src_v2.core.config.config import config
 from src_v2.core.log import logger
@@ -73,7 +74,6 @@ class SDEExtractor:
         # 如果目录已存在，先删除
         if os.path.exists(extract_to):
             logger.info(f"清理已存在的解压目录: {extract_to}")
-            import shutil
             shutil.rmtree(extract_to)
         
         os.makedirs(extract_to, exist_ok=True)
@@ -106,7 +106,6 @@ class SDEExtractor:
             # 清理失败的解压目录
             if os.path.exists(extract_to):
                 try:
-                    import shutil
                     shutil.rmtree(extract_to)
                 except:
                     pass

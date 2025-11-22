@@ -10,9 +10,11 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from contextlib import asynccontextmanager
+from sqlalchemy import text
 
 from src_v2.core.config.config import config
 from src_v2.core.log import logger
+from src_v2.core.database.connect_manager import PostgreDatabaseManager
 
 # 创建独立的 SDE 模型基类
 SDEModel = declarative_base()
@@ -98,7 +100,6 @@ class SDEDatabaseManager:
                 postgres_engine = create_async_engine(postgres_url, pool_pre_ping=True)
                 
                 async with postgres_engine.begin() as conn:
-                    from sqlalchemy import text
                     # 检查数据库是否已存在（可能在其他连接中刚创建）
                     check_sql = text("""
                         SELECT 1 FROM pg_database WHERE datname = :dbname
@@ -185,7 +186,6 @@ class SDEDatabaseManager:
         # 创建表结构
         if base_classes and self.engine:
             async with self.engine.begin() as conn:
-                from src_v2.core.database.connect_manager import PostgreDatabaseManager
                 db_manager = PostgreDatabaseManager()
                 for base_class in base_classes:
                     await db_manager.create_default_table(conn, base_class)

@@ -76,7 +76,7 @@ const todoItems = ref<TodoItem[]>([
     completed: false,
     children: [
       { id: 'permission', title: '服务权限分级', completed: true },
-      { id: 'invite-code', title: '邀请码生成', completed: true },
+
       { id: 'help-doc', title: '内建使用说明', completed: false },
       { id: 'performance', title: '性能优化', completed: false },
       { id: 'ux-improve', title: '用户体验改进', completed: false },
@@ -90,23 +90,23 @@ const progress = computed(() => {
   const calculateProgress = (items: TodoItem[]): { total: number; completed: number } => {
     let total = 0
     let completed = 0
-    
+
     items.forEach(item => {
       total++
       if (item.completed) {
         completed++
       }
-      
+
       if (item.children) {
         const childProgress = calculateProgress(item.children)
         total += childProgress.total
         completed += childProgress.completed
       }
     })
-    
+
     return { total, completed }
   }
-  
+
   const stats = calculateProgress(todoItems.value)
   return {
     percentage: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,

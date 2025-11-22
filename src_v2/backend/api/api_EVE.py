@@ -13,6 +13,7 @@ from src_v2.core.log import logger
 from src_v2.model.EVE.eveesi.oauth import get_auth_url, get_token, CALLBACK_LOCAL_HOST
 from src_v2.model.EVE.character.character_manager import CharacterManager
 from src_v2.core.utils import KahunaException
+from urllib.parse import urlparse, parse_qs, urlencode
 
 # app = Quart(__name__)
 # app.config['SECRET_KEY'] = 'your-secret-key-here'
@@ -93,7 +94,6 @@ async def eve_oauth_callback():
         full_path = request.full_path
 
         # 将URL中的state替换回原始的oauth_state，以便fetch_token验证
-        from urllib.parse import urlparse, parse_qs, urlencode
         parsed = urlparse(full_path)
         query_params = parse_qs(parsed.query)
         # 替换state为原始的oauth_state

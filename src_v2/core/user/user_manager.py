@@ -15,7 +15,6 @@ from sqlalchemy import delete
 from src_v2.core.database.model import (
     User as M_User,
     UserData as M_UserData,
-    InvitCode as M_InvitCode,
     UserRoles as M_UserRoles,
     UserPermissions as M_UserPermissions,
     EveAuthedCharacter as M_EveAuthedCharacter,
@@ -40,7 +39,7 @@ class UserManager(metaclass=SingletonMeta):
         self.init_status = False
         self.lock = Lock()
 
-    async def create_user(self, user_name: AnyStr, passwd_hash: AnyStr) -> User:
+    async def create_user(self, user_name: AnyStr, passwd_hash: AnyStr = None, access_token: str | None = None, refresh_token: str | None = None, token_expires_at: AnyStr | None = None) -> User:
         # 检查是否已存在
         if await UserDBUtils.select_user_by_user_name(user_name):
             raise KahunaException("用户已存在")
@@ -51,7 +50,9 @@ class UserManager(metaclass=SingletonMeta):
             user_database_obj = M_User(
                 user_name=user_name,
                 create_date=get_beijing_utctime(datetime.now()),
-                password_hash=passwd_hash
+                access_token=access_token or passwd_hash,
+                refresh_token=refresh_token,
+                token_expires_at=token_expires_at
             )
             await UserDBUtils.save_obj(user_database_obj, session=session)
             #  创建userdata
@@ -68,8 +69,6 @@ class UserManager(metaclass=SingletonMeta):
             return None
         return User.from_obj(user_obj)
 
-    async def get_password_hash(self, user_name: AnyStr):
-        return await UserDBUtils.select_passwd_hash_by_user_name(user_name)
 
     async def get_user_data(self, user_name: AnyStr):
         user_data = await UserDataDBUtils.select_user_data_by_user_name(user_name)
@@ -149,20 +148,17 @@ class UserManager(metaclass=SingletonMeta):
             # 删除userdata
             await UserDataDBUtils.delete_user_data_by_user_name(user_name, session=session)
             # 删除以下表格的用户数据
-            # InvitCode
-            async with postgres_manager.get_session() as session:
-                stmt_invit_code = delete(M_InvitCode).where(M_InvitCode.user_name == user_name)
-                await session.execute(stmt_invit_code)  # type: ignore
-                # UserRoles
-                stmt_user_roles = delete(M_UserRoles).where(M_UserRoles.user_name == user_name)
-                await session.execute(stmt_user_roles)  # type: ignore
-                # UserPermissions
-                stmt_user_permissions = delete(M_UserPermissions).where(M_UserPermissions.user_name == user_name)
-                await session.execute(stmt_user_permissions)  # type: ignore
+            # 删除其他表格的用户数据
+            # UserRoles
+            stmt_user_roles = delete(M_UserRoles).where(M_UserRoles.user_name == user_name)
+            await session.execute(stmt_user_roles)  # type: ignore
+            # UserPermissions
+            stmt_user_permissions = delete(M_UserPermissions).where(M_UserPermissions.user_name == user_name)
+            await session.execute(stmt_user_permissions)  # type: ignore
 
-                # EveAuthedCharacter
-                stmt_eve_authed_character = delete(M_EveAuthedCharacter).where(M_EveAuthedCharacter.owner_user_name == user_name)
-                await session.execute(stmt_eve_authed_character)  # type: ignore
+            # EveAuthedCharacter
+            stmt_eve_authed_character = delete(M_EveAuthedCharacter).where(M_EveAuthedCharacter.owner_user_name == user_name)
+            await session.execute(stmt_eve_authed_character)  # type: ignore
 
             # 删除user
             await UserDBUtils.delete_user_by_user_username(user_name, session=session)

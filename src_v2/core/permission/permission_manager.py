@@ -6,8 +6,6 @@ from ..database.kahuna_database_utils_v2 import (
     RoleHierarchyDBUtils,
     UserPermissionsDBUtils,
     UserDBUtils,
-    InvitCodeDBUtils,
-    InviteCodeUsedHistoryDBUtils,
     VipStateDBUtils
 )
 from ..database.connect_manager import postgres_manager as dbm, redis_manager as rdm
@@ -21,8 +19,7 @@ from ..database.model import (
     RolePermissions as M_RolePermissions,
     RoleHierarchy as M_RoleHierarchy,
     UserPermissions as M_UserPermissions,
-    InvitCode as M_InvitCode,
-    InviteCodeUsedHistory as M_InviteCodeUsedHistory
+    
 )
 
 class PermissionManager():
@@ -307,158 +304,7 @@ class PermissionManager():
         await self.create_role('vip_alpha', role_description='alpha')
         await self.create_role('vip_omega', role_description='omega')
 
-    async def generate_invite_code(self, creator_user_name: str, used_count_max: int) -> str:
-        """生成邀请码
-        
-        Args:
-            creator_user_name: 创建者用户名
-            used_count_max: 使用次数上限
-            
-        Returns:
-            str: 生成的邀请码（UUID字符串）
-        """
-        # 生成UUID作为邀请码
-        invite_code = str(uuid.uuid4())
-        
-        # 创建邀请码对象
-        invite_code_obj = M_InvitCode(
-            invite_code=invite_code,
-            creator_user_name=creator_user_name,
-            create_date=datetime.now(),
-            used_count_max=used_count_max,
-            used_count_current=0
-        )
-        
-        # 保存到数据库
-        await InvitCodeDBUtils.save_obj(invite_code_obj)
-        
-        return invite_code
-
-    async def validate_invite_code(self, invite_code: str) -> dict:
-        """校验邀请码是否存在且未使用完
-        
-        Args:
-            invite_code: 邀请码
-            
-        Returns:
-            dict: 包含邀请码信息和是否可用的字典
-                {
-                    "valid": bool,  # 邀请码是否存在
-                    "available": bool,  # 是否可用（未使用完）
-                    "invite_code": str,  # 邀请码
-                    "used_count_current": int,  # 当前使用次数
-                    "used_count_max": int,  # 使用次数上限
-                    "creator_user_name": str,  # 创建者
-                    "create_date": datetime  # 创建时间
-                }
-        """
-        invite_code_obj = await InvitCodeDBUtils.select_invite_code_by_code(invite_code)
-        
-        if not invite_code_obj:
-            return {
-                "valid": False,
-                "available": False,
-                "invite_code": invite_code
-            }
-        
-        available = invite_code_obj.used_count_current < invite_code_obj.used_count_max
-        
-        return {
-            "valid": True,
-            "available": available,
-            "invite_code": invite_code_obj.invite_code,
-            "used_count_current": invite_code_obj.used_count_current,
-            "used_count_max": invite_code_obj.used_count_max,
-            "creator_user_name": invite_code_obj.creator_user_name,
-            "create_date": invite_code_obj.create_date
-        }
-
-    async def use_invite_code(self, invite_code: str, user_name: str) -> None:
-        """使用邀请码，增加使用次数，记录使用历史
-        
-        Args:
-            invite_code: 邀请码
-            user_name: 使用该邀请码的用户名
-            
-        Raises:
-            ValueError: 如果邀请码不存在或已使用完
-        """
-        # 在校验和使用时使用事务保证原子性
-        async with dbm.get_session() as session:
-            # 查询邀请码（在同一事务中）
-            invite_code_obj = await InvitCodeDBUtils.select_invite_code_by_code(invite_code, session=session)
-            
-            if not invite_code_obj:
-                raise ValueError(f"邀请码 {invite_code} 不存在")
-            
-            if invite_code_obj.used_count_current >= invite_code_obj.used_count_max:
-                raise ValueError(f"邀请码 {invite_code} 已达到使用次数上限")
-            
-            # 增加使用次数
-            invite_code_obj.used_count_current += 1
-            await InvitCodeDBUtils.merge(invite_code_obj, session=session)
-            
-            # 记录使用历史
-            history_obj = M_InviteCodeUsedHistory(
-                invite_code=invite_code,
-                used_user_name=user_name,
-                used_date=datetime.now()
-            )
-            await InviteCodeUsedHistoryDBUtils.save_obj(history_obj, session=session)
-
-    async def get_invite_code_list(self, only_available: bool = False) -> list:
-        """获取邀请码列表，支持筛选未使用完的
-        
-        Args:
-            only_available: 是否只返回未使用完的邀请码
-            
-        Returns:
-            list: 邀请码信息列表，每个元素包含：
-                {
-                    "invite_code": str,
-                    "creator_user_name": str,
-                    "create_date": datetime,
-                    "used_count_current": int,
-                    "used_count_max": int,
-                    "remaining_count": int  # 剩余使用次数
-                }
-        """
-        invite_codes = []
-        async for invite_code_obj in await InvitCodeDBUtils.select_all_invite_codes(only_available=only_available):
-            # 确保数值字段不为 None
-            used_count_current = invite_code_obj.used_count_current if invite_code_obj.used_count_current is not None else 0
-            used_count_max = invite_code_obj.used_count_max if invite_code_obj.used_count_max is not None else 0
-            
-            invite_codes.append({
-                "invite_code": invite_code_obj.invite_code or '',
-                "creator_user_name": invite_code_obj.creator_user_name or '',
-                "create_date": invite_code_obj.create_date,
-                "used_count_current": used_count_current,
-                "used_count_max": used_count_max,
-                "remaining_count": used_count_max - used_count_current
-            })
-        return invite_codes
-
-    async def get_invite_code_users(self, invite_code: str) -> list:
-        """获取使用该邀请码注册的用户列表
-        
-        Args:
-            invite_code: 邀请码
-            
-        Returns:
-            list: 用户信息列表，每个元素包含：
-                {
-                    "user_name": str,
-                    "used_date": datetime
-                }
-        """
-        users = []
-        async for history_obj in await InviteCodeUsedHistoryDBUtils.select_history_by_invite_code(invite_code):
-            users.append({
-                "user_name": history_obj.used_user_name,
-                "used_date": history_obj.used_date
-            })
-        return users
+    
 
     async def get_vip_state(self, user_name: str):
         vip_state_obj = await VipStateDBUtils.select_vip_state_by_user_name(user_name)

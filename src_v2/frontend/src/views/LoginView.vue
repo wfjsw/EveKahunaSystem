@@ -5,7 +5,7 @@
         <h2>登录 Kahuna-System</h2>
         <p>请输入您的账号信息</p>
       </div>
-      
+
       <el-form
         ref="loginFormRef"
         :model="loginForm"
@@ -21,7 +21,7 @@
             @keyup.enter="focusPassword"
           />
         </el-form-item>
-        
+
         <el-form-item prop="password">
           <el-input
             ref="passwordInputRef"
@@ -34,20 +34,19 @@
             @keyup.enter="handleLogin"
           />
         </el-form-item>
-        
+
         <el-form-item>
           <el-button
             type="primary"
             size="large"
             class="login-button"
-            :loading="authStore.isLoading"
             @click="handleLogin"
           >
-            登录
+            使用 Winterco 登录
           </el-button>
         </el-form-item>
       </el-form>
-      
+
       <div class="register-link">
         <el-button
           type="text"
@@ -57,12 +56,12 @@
           还没有账号？立即注册
         </el-button>
       </div>
-      
+
       <div v-if="authStore.error" class="error-message">
         {{ authStore.error }}
       </div>
     </div>
-    
+
     <!-- 注册对话框 -->
     <el-dialog
       v-model="showRegisterDialog"
@@ -84,7 +83,7 @@
             size="large"
           />
         </el-form-item>
-        
+
         <el-form-item label="密码" prop="password">
           <el-input
             v-model="registerForm.password"
@@ -94,7 +93,7 @@
             show-password
           />
         </el-form-item>
-        
+
         <el-form-item label="确认密码" prop="confirmPassword">
           <el-input
             v-model="registerForm.confirmPassword"
@@ -104,16 +103,9 @@
             show-password
           />
         </el-form-item>
-        
-        <el-form-item label="邀请码" prop="inviteCode">
-          <el-input
-            v-model="registerForm.inviteCode"
-            placeholder="请输入邀请码"
-            size="large"
-          />
-        </el-form-item>
+
       </el-form>
-      
+
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="showRegisterDialog = false">取消</el-button>
@@ -155,7 +147,7 @@ const registerForm = reactive({
   username: '',
   password: '',
   confirmPassword: '',
-  inviteCode: ''
+
 })
 
 // 验证用户名格式（只能包含字母和数字）
@@ -200,9 +192,7 @@ const registerRules: FormRules = {
   confirmPassword: [
     { required: true, validator: validateConfirmPassword, trigger: 'blur' }
   ],
-  inviteCode: [
-    { required: true, message: '请输入邀请码', trigger: 'blur' }
-  ]
+
 }
 
 // 用户名输入框回车时，聚焦到密码框
@@ -214,33 +204,18 @@ const focusPassword = () => {
 
 // 密码输入框回车时，执行登录
 const handleLogin = async () => {
-  if (!loginFormRef.value) return
-  
-  try {
-    await loginFormRef.value.validate()
-    const result = await authStore.login(loginForm)
-  
-    if (result.success) {
-      ElMessage.success('登录成功')
-      // 等待下一个 tick，确保状态更新完成
-      await nextTick()
-      router.push('/home')
-    } else {
-      ElMessage.error(result.error || '登录失败')
-    }
-  } catch (error) {
-    console.error('表单验证失败:', error)
-  }
+  // Redirect to backend OIDC login start endpoint
+  window.location.href = '/api/auth/oidc/login'
 }
 
 // 处理注册
 const handleRegister = async () => {
   if (!registerFormRef.value) return
-  
+
   try {
     await registerFormRef.value.validate()
     isRegistering.value = true
-    
+
     const response = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: {
@@ -248,13 +223,12 @@ const handleRegister = async () => {
       },
       body: JSON.stringify({
         username: registerForm.username,
-        password: registerForm.password,
-        inviteCode: registerForm.inviteCode
+        password: registerForm.password
       }),
     })
-    
+
     const data = await response.json()
-    
+
     if (data.status === 200) {
       ElMessage.success(data.message || '注册成功，请登录')
       showRegisterDialog.value = false
@@ -280,7 +254,7 @@ const handleDialogClose = () => {
   registerForm.username = ''
   registerForm.password = ''
   registerForm.confirmPassword = ''
-  registerForm.inviteCode = ''
+
 }
 
 onMounted(() => {
@@ -288,7 +262,7 @@ onMounted(() => {
   if (authStore.isAuthenticated) {
     router.push('/')
   }
-  
+
   // 自动聚焦到用户名输入框
   const usernameInput = document.querySelector('input[placeholder="用户名"]') as HTMLInputElement
   if (usernameInput) {

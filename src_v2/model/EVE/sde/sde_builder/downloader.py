@@ -12,6 +12,7 @@ from tqdm import tqdm
 from src_v2.core.config.config import config
 from src_v2.core.log import logger
 from src_v2.core.utils.path import DOWNLOAD_RESOURCE_PATH
+import json
 
 
 class SDEDownloader:
@@ -45,7 +46,6 @@ class SDEDownloader:
                         # JSONL 格式，每行一个 JSON 对象
                         for line in text.strip().split('\n'):
                             if line.strip():
-                                import json
                                 data = json.loads(line)
                                 if data.get('_key') == 'sde':
                                     logger.info(f"获取到最新版本: buildNumber={data.get('buildNumber')}, "

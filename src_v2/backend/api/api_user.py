@@ -11,6 +11,7 @@ from src_v2.core.database.model import EveAliasCharacter as M_EveAliasCharacter
 from src_v2.core.database.kahuna_database_utils_v2 import EveAliasCharacterDBUtils
 from src_v2.model.EVE.eveesi import eveesi
 from src_v2.core.utils import KahunaException
+from src_v2.model.EVE.eveesi.esi_api.character import characters_character
 
 api_user_bp = Blueprint('api_user', __name__, url_prefix='/api/user')
 
@@ -180,9 +181,6 @@ async def search_character():
         if not input_value:
             return jsonify({"status": 400, "message": "请输入搜索值"}), 400
         
-        from src_v2.model.EVE.eveesi.esi_api.character import characters_character
-        from src_v2.core.database.kahuna_database_utils_v2 import EvePublicCharacterInfoDBUtils
-        
         result = []
         
         if input_type == 'characterId':
@@ -243,9 +241,7 @@ async def add_alias_characters():
         
         main_character_id = await UserManager().get_main_character_id(user_id)
         
-        from src_v2.model.EVE.eveesi.esi_api.character import characters_character
-        from src_v2.core.database.kahuna_database_utils_v2 import EveAliasCharacterDBUtils
-        from src_v2.core.database.model import EveAliasCharacter as M_EveAliasCharacter
+        # characters_character and DB utils are imported at module top
         
         added_count = 0
         failed_list = []

@@ -10,7 +10,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from src_v2.core.log import logger
 from .parser import SDEParser
 from .database_manager import SDEModel
-from .inv_types_model import InvTypes
+
+# side effects
+from .inv_types_model import InvTypes 
 from .blueprints_model import (
     IndustryBlueprints, IndustryActivities, IndustryActivityMaterials, IndustryActivityProducts
 )
@@ -20,6 +22,9 @@ from .map_solar_systems_model import MapSolarSystems
 from .map_regions_model import MapRegions
 from .inv_categories_model import InvCategories
 from .inv_groups_model import InvGroups
+
+from src_v2.core.database.connect_manager import PostgreDatabaseManager
+import traceback
 
 
 class SDEModelGenerator:
@@ -153,7 +158,6 @@ class SDEModelGenerator:
             
             # 使用 PostgreDatabaseManager 的 create_default_table 方法
             # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
-            from src_v2.core.database.connect_manager import PostgreDatabaseManager
             db_manager = PostgreDatabaseManager()
             
             # 确保 InvTypes 类已经被导入（通过导入语句）
@@ -164,7 +168,6 @@ class SDEModelGenerator:
             return True
         except Exception as e:
             logger.error(f"创建 InvTypes 表失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return False
     
@@ -184,7 +187,6 @@ class SDEModelGenerator:
             
             # 使用 PostgreDatabaseManager 的 create_default_table 方法
             # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
-            from src_v2.core.database.connect_manager import PostgreDatabaseManager
             db_manager = PostgreDatabaseManager()
             
             # 确保蓝图模型类已经被导入（通过导入语句）
@@ -196,7 +198,6 @@ class SDEModelGenerator:
             return True
         except Exception as e:
             logger.error(f"创建蓝图表失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return False
     
@@ -216,7 +217,6 @@ class SDEModelGenerator:
             
             # 使用 PostgreDatabaseManager 的 create_default_table 方法
             # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
-            from src_v2.core.database.connect_manager import PostgreDatabaseManager
             db_manager = PostgreDatabaseManager()
             
             # 确保 MetaGroups 类已经被导入（通过导入语句）
@@ -227,7 +227,6 @@ class SDEModelGenerator:
             return True
         except Exception as e:
             logger.error(f"创建 MetaGroups 表失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return False
     
@@ -247,7 +246,6 @@ class SDEModelGenerator:
             
             # 使用 PostgreDatabaseManager 的 create_default_table 方法
             # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
-            from src_v2.core.database.connect_manager import PostgreDatabaseManager
             db_manager = PostgreDatabaseManager()
             
             # 确保 MarketGroups 类已经被导入（通过导入语句）
@@ -258,7 +256,6 @@ class SDEModelGenerator:
             return True
         except Exception as e:
             logger.error(f"创建 MarketGroups 表失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return False
     
@@ -278,7 +275,6 @@ class SDEModelGenerator:
             
             # 使用 PostgreDatabaseManager 的 create_default_table 方法
             # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
-            from src_v2.core.database.connect_manager import PostgreDatabaseManager
             db_manager = PostgreDatabaseManager()
             
             # 确保 MapSolarSystems 类已经被导入（通过导入语句）
@@ -289,7 +285,6 @@ class SDEModelGenerator:
             return True
         except Exception as e:
             logger.error(f"创建 MapSolarSystems 表失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return False
     
@@ -309,7 +304,6 @@ class SDEModelGenerator:
             
             # 使用 PostgreDatabaseManager 的 create_default_table 方法
             # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
-            from src_v2.core.database.connect_manager import PostgreDatabaseManager
             db_manager = PostgreDatabaseManager()
             
             # 确保 MapRegions 类已经被导入（通过导入语句）
@@ -320,7 +314,6 @@ class SDEModelGenerator:
             return True
         except Exception as e:
             logger.error(f"创建 MapRegions 表失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return False
     
@@ -340,7 +333,6 @@ class SDEModelGenerator:
             
             # 使用 PostgreDatabaseManager 的 create_default_table 方法
             # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
-            from src_v2.core.database.connect_manager import PostgreDatabaseManager
             db_manager = PostgreDatabaseManager()
             
             # 确保 InvCategories 类已经被导入（通过导入语句）
@@ -351,7 +343,6 @@ class SDEModelGenerator:
             return True
         except Exception as e:
             logger.error(f"创建 InvCategories 表失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return False
     
@@ -371,7 +362,6 @@ class SDEModelGenerator:
             
             # 使用 PostgreDatabaseManager 的 create_default_table 方法
             # 它会自动检查表是否存在，如果不存在则创建，如果存在则检查结构是否一致
-            from src_v2.core.database.connect_manager import PostgreDatabaseManager
             db_manager = PostgreDatabaseManager()
             
             # 确保 InvGroups 类已经被导入（通过导入语句）
@@ -382,7 +372,6 @@ class SDEModelGenerator:
             return True
         except Exception as e:
             logger.error(f"创建 InvGroups 表失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return False
     
