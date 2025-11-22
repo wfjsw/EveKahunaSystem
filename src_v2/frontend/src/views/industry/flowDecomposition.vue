@@ -589,17 +589,17 @@ const LackRowClassName = (data: { row: any, rowIndex: number }) => {
                 />
             </el-tab-pane>
             
-            <el-tab-pane label="成本视图" v-if="haveAlphaRole">
+            <el-tab-pane label="成本视图" :disabled="!haveAlphaRole">
                 <CostView 
                     :-plan-calculate-e-i-v-cost-table-view="PlanCalculateEIVCostTableView"
                 />
             </el-tab-pane>
             
-            <el-tab-pane label="劳动力视图" v-if="haveAlphaRole">
+            <el-tab-pane label="劳动力视图" :disabled="!haveAlphaRole">
                 <LaborView :running-jobs="PlanCalculateRunningJobTableView" />
             </el-tab-pane>
 
-            <el-tab-pane label="物流视图" v-if="haveAlphaRole">
+            <el-tab-pane label="物流视图" :disabled="!haveAlphaRole">
                 <LogisticsView 
                     :logistics-data="PlanCalculateLogisticsTableView"
                     :selected-plan="selectedPlan"
