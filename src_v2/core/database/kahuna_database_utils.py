@@ -3,10 +3,9 @@ from typing import Dict
 from sqlalchemy import delete, select, text, func, distinct
 from sqlalchemy.dialects.sqlite import insert as insert
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from .connect_manager import database_manager as dbm
-from ....utils import get_beijing_utctime
 
 from .config_model import (
     AssetOwner,
@@ -687,7 +686,7 @@ class RefreshDataDBUtils(CommonUtils):
         async with async_session() as session:
             async with session.begin():
                 try:
-                    refresh_date = get_beijing_utctime(datetime.now())
+                    refresh_date = datetime.now(timezone.utc)
                     # 尝试查找是否已存在该id的记录
                     # existing_record = cls.model.get_or_none(cls.model.id == id)
                     stmt = select(cls.cls_model).where(cls.cls_model.id == id)
@@ -726,7 +725,7 @@ class RefreshDataDBUtils(CommonUtils):
                     if not refresh_date:
                         return True
                     # logger.info(f"now - refresh_date: {get_beijing_utctime(datetime.now()) - refresh_date.date}")
-                    return get_beijing_utctime(datetime.now()) - refresh_date.date > time_interval
+                    return datetime.now(timezone.utc) - refresh_date.date > time_interval
                 except Exception as e:
                     logger.error(e)
                     raise
@@ -743,7 +742,7 @@ class RefreshDataDBUtils(CommonUtils):
                     if not refresh_date:
                         return True
                     # 获取当前北京时间
-                    current_date = get_beijing_utctime(datetime.now()).date()
+                    current_date = datetime.now(timezone.utc).date()
                     # 获取上次刷新的日期部分
                     last_refresh_date = refresh_date.date.date()
 
@@ -768,8 +767,8 @@ class RefreshDataDBUtils(CommonUtils):
                     if not refresh_date:
                         return True
 
-                    # 获取当前北京时间
-                    current_time = get_beijing_utctime(datetime.now())
+                    # 获取当前UTC时间
+                    current_time = datetime.now(timezone.utc)
                     # 获取上次刷新的时间
                     last_refresh_time = refresh_date.date
 
@@ -806,7 +805,7 @@ class RefreshDataDBUtils(CommonUtils):
                 if not refresh_date:
                     refresh_date = cls.get_obj()
                     refresh_date.id = id
-                refresh_date.date = get_beijing_utctime(datetime.now())
+                refresh_date.date = datetime.now(timezone.utc)
                 session.add(refresh_date)
                 if log:
                     logger.info(f'缓存标志 {id} 刷新时间到 {refresh_date.date}')

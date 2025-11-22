@@ -9,7 +9,7 @@ import jinja2  # 添加Jinja2导入
 import requests
 import base64
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pyppeteer import launch
 import math
 
@@ -17,7 +17,7 @@ from ...model.EVE.sde import SdeUtils
 from ..market_server import MarketManager
 from ..config_server.config import config
 from ..evesso_server import eveesi
-from ...utils import KahunaException, get_beijing_utctime
+from ...utils import KahunaException
 from ...utils.path import TMP_PATH, RESOURCE_PATH
 from ..log_server import logger
 
@@ -256,14 +256,11 @@ class PictureRender():
         )
         env.filters['format_number'] = format_number
         template = env.get_template('sell_list_template.j2')
-        current = datetime.now()
-        if current.astimezone().utcoffset().total_seconds() == 0:  # 如果是UTC时区
-            # 转换为北京时间 (UTC+8)
-            current = current + timedelta(hours=8)
+        current = datetime.now(timezone.utc)
         html_content = template.render(
             items=items,
             header_image=PictureRender.get_image_base64(os.path.join(RESOURCE_PATH, 'img', 'sell_list_header.png')),
-            current_time=current.strftime('%Y-%m-%d %H:%M:%S') + ' UTC+8',
+            current_time=current.strftime('%Y-%m-%d %H:%M:%S') + ' UTC',
         )
 
         # 生成输出路径
@@ -284,10 +281,7 @@ class PictureRender():
         )
         env.filters['format_number'] = format_number
         template = env.get_template('refine_template.j2')
-        current = datetime.now()
-        if current.astimezone().utcoffset().total_seconds() == 0:  # 如果是UTC时区
-            # 转换为北京时间 (UTC+8)
-            current = current + timedelta(hours=8)
+        current = datetime.now(timezone.utc)
         html_content = template.render(
             data=ref_res,
             header_image=PictureRender.get_image_base64(os.path.join(RESOURCE_PATH, 'img', 'sell_list_header.png'))
@@ -319,7 +313,6 @@ class PictureRender():
         )
         env.filters['format_number'] = format_number
         template = env.get_template('t2mk_template.j2')
-        current = get_beijing_utctime(datetime.now())
         html_content = template.render(
             all_data=data_list,
             feature_list=feature_list,
@@ -346,7 +339,6 @@ class PictureRender():
         )
         env.filters['format_number'] = format_number
         template = env.get_template('buy_list_template.j2')
-        current = get_beijing_utctime(datetime.now())
         html_content = template.render(
             buy_list_data=lack_dict,
             provider_data=provider_data,
@@ -372,7 +364,6 @@ class PictureRender():
         )
         env.filters['format_number'] = format_number
         template = env.get_template('asset_statistic_template.j2')
-        current = get_beijing_utctime(datetime.now())
         html_content = template.render(
             header_title='资产分析',
             header_image=PictureRender.get_image_base64(os.path.join(RESOURCE_PATH, 'img', 'sell_list_header.png')),
@@ -395,7 +386,7 @@ class PictureRender():
         for order in order_data:
             order.update({
                 'icon': await PictureRender.get_eve_item_icon_base64(order['type_id']),
-                'date_remain': order['duration'] - (get_beijing_utctime(datetime.now()) - order['issued']).days,
+                'date_remain': order['duration'] - (datetime.now(timezone.utc) - order['issued']).days,
             })
         env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(template_path),
@@ -431,7 +422,6 @@ class PictureRender():
         )
         env.filters['format_number'] = format_number
         template = env.get_template('month_order_statistic.j2')
-        current = get_beijing_utctime(datetime.now())
         html_content = template.render(
             header_title='月KPI统计',
             header_image=PictureRender.get_image_base64(os.path.join(RESOURCE_PATH, 'img', 'sell_list_header.png')),
@@ -460,7 +450,6 @@ class PictureRender():
         )
         env.filters['format_number'] = format_number
         template = env.get_template('moon_material_state_template.j2')
-        current = get_beijing_utctime(datetime.now())
         html_content = template.render(
             header_title='元素市场',
             header_image=PictureRender.get_image_base64(os.path.join(RESOURCE_PATH, 'img', 'sell_list_header.png')),
@@ -488,7 +477,6 @@ class PictureRender():
         env.filters['format_currency'] = format_number
         env.filters['round'] = round_filter
         template = env.get_template('coop_pay_template.j2')
-        current = get_beijing_utctime(datetime.now())
         html_content = template.render(
             header_title='合作报酬',
             header_image=PictureRender.get_image_base64(os.path.join(RESOURCE_PATH, 'img', 'sell_list_header.png')),

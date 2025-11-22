@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AnyStr
 
 from cachetools import TTLCache
@@ -30,7 +30,7 @@ from src_v2.core.log import logger
 from src_v2.model.EVE.character.character_manager import CharacterManager
 from src_v2.model.EVE.character.character import Character
 # import Exception
-from src_v2.core.utils import KahunaException, SingletonMeta, get_beijing_utctime
+from src_v2.core.utils import KahunaException, SingletonMeta
 from src_v2.core.permission.permission_manager import permission_manager
 
 ESI_CACHE = TTLCache(maxsize=100, ttl=300)
@@ -39,7 +39,7 @@ class UserManager(metaclass=SingletonMeta):
         self.init_status = False
         self.lock = Lock()
 
-    async def create_user(self, user_name: AnyStr, passwd_hash: AnyStr = None, access_token: str | None = None, refresh_token: str | None = None, token_expires_at: AnyStr | None = None) -> User:
+    async def create_user(self, user_name: AnyStr, access_token: str | None = None, refresh_token: str | None = None, token_expires_at: AnyStr | None = None) -> User:
         # 检查是否已存在
         if await UserDBUtils.select_user_by_user_name(user_name):
             raise KahunaException("用户已存在")
@@ -49,8 +49,8 @@ class UserManager(metaclass=SingletonMeta):
         async with postgres_manager.get_session() as session:
             user_database_obj = M_User(
                 user_name=user_name,
-                create_date=get_beijing_utctime(datetime.now()),
-                access_token=access_token or passwd_hash,
+                create_date=datetime.now(timezone.utc),
+                access_token=access_token,
                 refresh_token=refresh_token,
                 token_expires_at=token_expires_at
             )

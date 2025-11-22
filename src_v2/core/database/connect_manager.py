@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Type
 import asyncio
 import os
@@ -702,7 +702,7 @@ class PostgreDatabaseManager():
                 has_rows = bool(has_rows_result.scalar())
 
                 # 生成临时表名（同库内唯一），最终表名保持与旧表一致
-                timestamp_suffix = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
+                timestamp_suffix = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
                 temp_table_name = f"{table_name}__tmp__{timestamp_suffix}"
                 backup_table_name = f"{table_name}__old__{timestamp_suffix}"
 

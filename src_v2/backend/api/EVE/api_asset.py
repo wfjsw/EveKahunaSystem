@@ -11,7 +11,7 @@ from src_v2.core.user.user_manager import UserManager
 from src_v2.model.EVE.asset.asset_manager import AssetManager
 from src_v2.core.log import logger
 from src_v2.core.database.kahuna_database_utils_v2 import EveAssetPullMissionDBUtils
-from src_v2.core.utils import get_beijing_utctime, KahunaException
+from src_v2.core.utils import KahunaException
 from datetime import datetime, timezone, timedelta
 from src_v2.core.database.model import EveAssetPullMission as M_EveAssetPullMission
 # from ..service.asset_server.asset_manager import AssetManager
@@ -270,8 +270,8 @@ async def pull_asset_now():
             try:
                 # 将字符串转换为 datetime 对象
                 last_pull_time = datetime.fromisoformat(last_pull_time_str.replace('Z', '+00:00'))
-                # 获取当前北京时间（与存储的格式一致）
-                current_time = get_beijing_utctime(datetime.now())
+                # 获取当前UTC时间
+                current_time = datetime.now(timezone.utc)
                 # 确保时区一致
                 if last_pull_time.tzinfo is None:
                     last_pull_time = last_pull_time.replace(tzinfo=timezone.utc)
@@ -287,7 +287,7 @@ async def pull_asset_now():
         asyncio.create_task(start_pull_asset_now(asset_owner_type, asset_owner_id))
 
         # 设置本次拉取时间（异步操作）
-        await rdm.r.set(f"asset_pull_mission_last_pull_time:{asset_owner_type}:{asset_owner_id}", get_beijing_utctime(datetime.now()).isoformat())
+        await rdm.r.set(f"asset_pull_mission_last_pull_time:{asset_owner_type}:{asset_owner_id}", datetime.now(timezone.utc).isoformat())
         return jsonify({"status": 200, "message": "任务启动成功"}), 200
     except KahunaException as e:
         return jsonify({"status": 500, "message": str(e)}), 500

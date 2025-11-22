@@ -14,7 +14,7 @@ from src_v2.core.log import logger
 from src_v2.model.EVE.character.character_manager import CharacterManager
 from src_v2.core.utils import KahunaException
 from src_v2.core.database.kahuna_database_utils_v2 import UserDBUtils
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # app = Quart(__name__)
 # app.config['SECRET_KEY'] = 'your-secret-key-here'
@@ -36,15 +36,10 @@ def create_token(user_id: str, role: str):
     payload = {
         'user_id': user_id,
         'role': role,
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+        'exp': datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
     }
     return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
 
-@api_auth_bp.route('/login', methods=['POST'])
-async def login():
-    """用户登录"""
-    # Username/password login is disabled when using OIDC.
-    return jsonify({"status": 400, "message": "用户名/密码登录已禁用，请使用 OIDC 登录"}), 400
 
 @api_auth_bp.route('/me', methods=['GET'])
 @auth_required
@@ -79,7 +74,7 @@ async def oidc_login():
     """Start OpenID Connect authorization by redirecting to provider."""
     client_id = os.getenv('OIDC_CLIENT_ID') or app.config.get('OIDC_CLIENT_ID')
     redirect_uri = os.getenv('OIDC_REDIRECT_URI') or app.config.get('OIDC_REDIRECT_URI') or 'http://localhost:5000/api/auth/oidc/callback'
-    state = jwt.encode({'rnd': os.urandom(8).hex(), 'ts': datetime.datetime.utcnow().isoformat()}, app.config.get('SECRET_KEY','secret'), algorithm='HS256')
+    state = jwt.encode({'rnd': os.urandom(8).hex(), 'ts': datetime.datetime.now(datetime.timezone.utc).isoformat()}, app.config.get('SECRET_KEY','secret'), algorithm='HS256')
     session['oidc_state'] = state
     provider = os.getenv('OIDC_PROVIDER') or app.config.get('OIDC_PROVIDER') or 'https://seat.winterco.org'
     config_url = f"{provider.rstrip('/')}/.well-known/openid-configuration"
@@ -93,7 +88,7 @@ async def oidc_login():
 
     client_id = os.getenv('OIDC_CLIENT_ID') or app.config.get('OIDC_CLIENT_ID')
     redirect_uri = os.getenv('OIDC_REDIRECT_URI') or app.config.get('OIDC_REDIRECT_URI') or (app.config.get('BASE_URL','http://localhost:5000') + '/api/auth/oidc/callback')
-    state = jwt.encode({'rnd': os.urandom(8).hex(), 'ts': datetime.datetime.utcnow().isoformat()}, app.config.get('SECRET_KEY','secret'), algorithm='HS256')
+    state = jwt.encode({'rnd': os.urandom(8).hex(), 'ts': datetime.datetime.now(datetime.timezone.utc).isoformat()}, app.config.get('SECRET_KEY','secret'), algorithm='HS256')
     nonce = os.urandom(8).hex()
     session['oidc_state'] = state
     session['oidc_nonce'] = nonce
@@ -169,7 +164,6 @@ async def oidc_callback():
             return jsonify({"status": 500, "message": "id_token validation failed"}), 500
 
         username = decoded.get('preferred_username') or decoded.get('email') or decoded.get('sub')
-        userinfo = decoded
 
         # verify nonce
         saved_nonce = session.get('oidc_nonce')
@@ -182,7 +176,7 @@ async def oidc_callback():
         try:
             expires_in = token_json.get('expires_in')
             if expires_in:
-                expires_at = datetime.utcnow() + timedelta(seconds=int(expires_in))
+                expires_at = datetime.now(datetime.timezone.utc) + timedelta(seconds=int(expires_in))
         except Exception:
             expires_at = None
 

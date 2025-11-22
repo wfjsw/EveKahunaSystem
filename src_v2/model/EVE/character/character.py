@@ -14,7 +14,7 @@ from ..eveesi.oauth import refresh_token
 from ..eveesi import eveesi
 from ..eveesi.eveutils import parse_iso_datetime
 from src_v2.core.log import logger
-from src_v2.core.utils import KahunaException, get_beijing_utctime
+from src_v2.core.utils import KahunaException
 
 
 class Character():
@@ -53,7 +53,7 @@ class Character():
         if refresh_res_dict:
             token_state.access_token = refresh_res_dict['access_token']
             token_state.refresh_token = refresh_res_dict['refresh_token']
-            token_state.expires_time = datetime.fromtimestamp(refresh_res_dict["expires_at"]).astimezone(timezone(timedelta(hours=+8), 'Shanghai')).replace(tzinfo=None)
+            token_state.expires_time = datetime.fromtimestamp(refresh_res_dict["expires_at"]).astimezone(timezone.utc)
             
             character_roles = await eveesi.characters_character_roles(token_state.access_token, self.character_id)
             director_status = "Director" in character_roles['roles'] if 'roles' in character_roles else None
@@ -100,10 +100,10 @@ class Character():
     @property
     def token_avaliable(self):
         # 获取当前时间
-        current = get_beijing_utctime(datetime.now())
+        current = datetime.now(timezone.utc)
 
-        # 添加15分钟缓冲并移除时区信息
-        now = (current + timedelta(minutes=5)).replace(tzinfo=None)
+        # 添加5分钟缓冲
+        now = current + timedelta(minutes=5)
 
         logger.debug(f"check if {self.token_expires_date} > {now} = {self.token_expires_date > now}")
         return self.token_expires_date > now

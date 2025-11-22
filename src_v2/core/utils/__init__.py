@@ -73,12 +73,7 @@ async def async_refresh_per_min(start_delay: int, interval: int, func):
 def get_user_tmp_cache_prefix(user_qq: int):
     return f"cache_{user_qq}_"
 
-def get_beijing_utctime(current: datetime) -> datetime:
-    # 检查是否为UTC时间（通过检查系统时区）
-    if current.astimezone().utcoffset().total_seconds() == 0:  # 如果是UTC时区
-        # 转换为北京时间 (UTC+8)
-        current = current + timedelta(hours=8)
-    return current
+# NOTE: `get_beijing_utctime` removed. Application now uses UTC everywhere.
 
 class classproperty(property):
     def __get__(self, instance, cls):

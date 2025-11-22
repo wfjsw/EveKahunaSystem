@@ -47,10 +47,10 @@ def get_auth_url(user_id: str = None):
         # 创建一个包含user_id的临时token，编码到state
         # 这样可以验证state的有效性，防止篡改
         state_payload = {
-            'user_id': user_id,
-            'oauth_state': base_state,  # 保留原始state用于验证
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=10)  # 10分钟过期
-        }
+                'user_id': user_id,
+                'oauth_state': base_state,  # 保留原始state用于验证
+                'exp': datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=10)  # 10分钟过期
+            }
         encoded_state = jwt.encode(state_payload, app.config['SECRET_KEY'], algorithm='HS256')
         
         # 将编码后的state替换到URL中

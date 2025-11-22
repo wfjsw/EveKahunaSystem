@@ -8,7 +8,8 @@ from tqdm.std import tqdm
 
 from src_v2.core.database.connect_manager import redis_manager as rdm, neo4j_manager
 from src_v2.core.utils import SingletonMeta, tqdm_manager
-from src_v2.core.utils import KahunaException, get_beijing_utctime
+from src_v2.core.utils import KahunaException
+from datetime import timezone
 
 from src_v2.model.EVE.character.character_manager import CharacterManager
 from src_v2.core.user.user_manager import UserManager
@@ -86,7 +87,7 @@ class AssetManager(metaclass=SingletonMeta):
         await self.clean_asset_pull_mission_assets(mission_obj)
         await self.processing_asset_pull_mission(mission_obj)
 
-        mission_obj.last_pull_time = get_beijing_utctime(datetime.now())
+        mission_obj.last_pull_time = datetime.now(timezone.utc)
         await EveAssetPullMissionDBUtils.merge(mission_obj)
 
     async def get_user_asset_pull_mission_list(self, user_name: str) -> list[dict]:
@@ -104,7 +105,7 @@ class AssetManager(metaclass=SingletonMeta):
                 'subject_name': subject_name,
                 'subject_id': mission.asset_owner_id,
                 'is_active': mission.active,
-                'last_pull_time': mission.last_pull_time.replace(tzinfo=timezone(timedelta(hours=+8), 'Shanghai'))
+                'last_pull_time': mission.last_pull_time.replace(tzinfo=timezone.utc)
             })
         logger.info(f"拉取个人创建的任务: {missions}")
         # 拉取同公司的任务
@@ -133,7 +134,7 @@ class AssetManager(metaclass=SingletonMeta):
                         'subject_name': corporation_info['name'],
                         'subject_id': mission.asset_owner_id,
                         'is_active': mission.active,
-                        'last_pull_time': mission.last_pull_time.replace(tzinfo=timezone(timedelta(hours=+8), 'Shanghai'))
+                        'last_pull_time': mission.last_pull_time.replace(tzinfo=timezone.utc)
                     })
                     logger.info(f"拉取同公司的任务: {missions}")
         logger.info(f"拉取同公司的任务: {missions}")
