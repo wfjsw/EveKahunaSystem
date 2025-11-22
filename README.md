@@ -49,7 +49,7 @@ Kahuna System 是一个专为 EVE Online 玩家设计的 Web 应用平台，集�
 
 - Python 3.13 或更高版本
 - Node.js 18+ (用于前端开发)
-- 数据库：SQLite (默认) 或 PostgreSQL + Neo4j + Redis (可选)
+- 数据库：SQLite (默认) 或 PostgreSQL + Neo4j + Redis
 
 ### 安装步骤
 
@@ -81,9 +81,7 @@ npm install
 
 4. **准备 SDE 数据库**
 
-项目需要 EVE Online 的 SDE (Static Data Export) 数据库。你可以使用 [EVE-SDE-Database-Builder](https://github.com/EVEIPH/EVE-SDE-Database-Builder) 工具生成 SQLite 格式的英文和中文 SDE 数据库。
-
-官方 SDE 数据下载地址: [https://developers.eveonline.com/](https://developers.eveonline.com/)
+请参考**手动创建 SDE 数据库**章节
 
 5. **配置 EVE API**
 
@@ -287,17 +285,6 @@ PIC_RENDER_PROXY = ""
 PROXY = "127.0.0.1"
 # 代理端口
 PORT = 7890
-```
-
-#### [SQLITEDB] - SQLite 数据库配置
-```toml
-[SQLITEDB]
-# 配置数据库路径（绝对路径）
-CONFIG_DB = "/path/to/kahuna.db"
-CACHE_DB = "/path/to/cache.db"
-# SDE 数据库路径
-SDEDB = "/path/to/sde.db"           # 英文 SDE 数据库
-CN_SDEDB = "/path/to/sde_cn.db"     # 中文 SDE 数据库
 ```
 
 #### [POSTGREDB] - PostgreSQL 数据库配置 (可选)
