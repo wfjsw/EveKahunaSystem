@@ -36,10 +36,26 @@ all_model.append(UserData)
 class InvitCode(PostgreModel):
     __tablename__ = 'invite_code'
     invite_code = Column(Text, primary_key=True)
-    user_name = Column(Text, ForeignKey("user.user_name"))
+    creator_user_name = Column(Text)
     create_date = Column(DateTime)
-    used_date = Column(DateTime)
+    used_count_max = Column(Integer)
+    used_count_current = Column(Integer, default=0, server_default='0')
 all_model.append(InvitCode)
+
+class VipState(PostgreModel):
+    __tablename__ = 'vip_state'
+    user_name = Column(Text, ForeignKey("user.user_name"), primary_key=True)
+    vip_level = Column(Text)
+    vip_end_date = Column(DateTime)
+all_model.append(VipState)
+
+class InviteCodeUsedHistory(PostgreModel):
+    __tablename__ = 'invite_code_used_history'
+    id = Column(Integer, primary_key=True)
+    invite_code = Column(Text, ForeignKey("invite_code.invite_code"))
+    used_user_name = Column(Text)
+    used_date = Column(DateTime)
+all_model.append(InviteCodeUsedHistory)
 
 class Roles(PostgreModel):
     __tablename__ = 'roles'

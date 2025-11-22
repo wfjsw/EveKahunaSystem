@@ -4,7 +4,7 @@ from astrbot.core.config import AstrBotConfig
 
 from .src.service.user_server.user_manager import UserManager
 from datetime import datetime
-from .src.service.log_server import logger
+from .src_v2.core.log import logger
 from .src.utils import KahunaException
 
 # import Exception

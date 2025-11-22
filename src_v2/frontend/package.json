@@ -23,6 +23,7 @@
     "echarts": "^6.0.0",
     "element-plus": "^2.11.7",
     "epic-spinners": "^2.0.0",
+    "marked": "^12.0.0",
     "pinia": "^3.0.3",
     "sortablejs": "^1.15.6",
     "vue": "^3.5.17",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@tsconfig/node22": "^22.0.2",
+    "@types/marked": "^6.0.0",
     "@types/node": "^22.15.32",
     "@vitejs/plugin-vue": "^6.0.0",
     "@vue/eslint-config-prettier": "^10.2.0",

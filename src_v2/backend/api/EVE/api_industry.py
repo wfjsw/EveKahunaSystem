@@ -13,7 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from sqlalchemy.exc import IntegrityError
 
 from src_v2.core.user.user_manager import UserManager
-from src.service.log_server import logger
+from src_v2.core.log import logger
 
 from src_v2.model.EVE.industry.industry_manager import IndustryManager
 from src_v2.core.database.neo4j_utils import Neo4jIndustryUtils as NIU
@@ -362,7 +362,7 @@ async def get_type_suggestions_list():
     data = await request.json
     
     try:
-        type_suggestions_list = SdeUtils.fuzz_type(data["type_name"], list_len=10)
+        type_suggestions_list = await SdeUtils.fuzz_type(data["type_name"], list_len=10)
         type_suggestions_list = [{"value": item, "label": item} for item in type_suggestions_list]
         return jsonify({"data": type_suggestions_list, "status": 200})
     except KahunaException as e:

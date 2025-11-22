@@ -45,19 +45,19 @@ async def get_structure_assign_keyword_suggestions(assign_type: str, query):
     """
     output = []
     if assign_type == 'group':
-        group_fuzz_list = SdeUtils.fuzz_group(query, list_len=10)
+        group_fuzz_list = await SdeUtils.fuzz_group(query, list_len=10)
         output.extend([{"value": item, "label": item} for item in group_fuzz_list])
     elif assign_type == 'meta':
-        meta_fuzz_list = SdeUtils.fuzz_meta(query, list_len=10)
+        meta_fuzz_list = await SdeUtils.fuzz_meta(query, list_len=10)
         output.extend([{"value": item, "label": item} for item in meta_fuzz_list])
     elif assign_type == 'blueprint':
-        blueprint_fuzz_list = SdeUtils.fuzz_blueprint(query, list_len=10)
+        blueprint_fuzz_list = await SdeUtils.fuzz_blueprint(query, list_len=10)
         output.extend([{"value": item, "label": item} for item in blueprint_fuzz_list])
     elif assign_type == 'marketGroup':
-        market_group_fuzz_list = SdeUtils.fuzz_market_group(query, list_len=10)
+        market_group_fuzz_list = await SdeUtils.fuzz_market_group(query, list_len=10)
         output.extend([{"value": item, "label": item} for item in market_group_fuzz_list])
     elif assign_type == 'category':
-        category_fuzz_list = SdeUtils.fuzz_category(query, list_len=10)
+        category_fuzz_list = await SdeUtils.fuzz_category(query, list_len=10)
         output.extend([{"value": item, "label": item} for item in category_fuzz_list])
 
     return output

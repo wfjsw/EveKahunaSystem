@@ -182,7 +182,7 @@ class AssetManager(metaclass=SingletonMeta):
             station_info, is_new = await self.get_station_info(station_id)
             if not is_new:
                 return
-            system_info = SdeUtils.get_system_info_by_id(station_info["system_id"])
+            system_info = await SdeUtils.get_system_info_by_id(station_info["system_id"])
             station_node = {
                 'station_id': station_id,
                 'station_name': station_info["name"],
@@ -235,7 +235,7 @@ class AssetManager(metaclass=SingletonMeta):
                 if asset["item_id"] in structure_item_id_list:
                     return
                 asset.update({
-                    'type_name': SdeUtils.get_name_by_id(asset['type_id']),
+                    'type_name': await SdeUtils.get_name_by_id(asset['type_id']),
                     'owner_id': mission_obj.asset_owner_id
                 })
                 await NIU.merge_node(
@@ -291,7 +291,7 @@ class AssetManager(metaclass=SingletonMeta):
                 elif asset["location_type"] == 'solar_system':
                     if asset["item_id"] in structure_item_id_list:
                         return
-                    system_info = SdeUtils.get_system_info_by_id(asset["location_id"])
+                    system_info = await SdeUtils.get_system_info_by_id(asset["location_id"])
                     system_node = {
                         'system_id': system_info['system_id'],
                         'system_name': system_info['system_name'],
@@ -411,7 +411,7 @@ class AssetManager(metaclass=SingletonMeta):
                 else:
                     logger.debug(f"建筑{forbidden_structure_node["item_id"]}无权限，创建无权限建筑")
                     structure_info_cache = {
-                        'name': f'Forbidden {SdeUtils.get_name_by_id(forbidden_structure_node['type_id']) if "type_id" in forbidden_structure_node else "unknown"}',
+                        'name': f'Forbidden {await SdeUtils.get_name_by_id(forbidden_structure_node['type_id']) if "type_id" in forbidden_structure_node else "unknown"}',
                         'owner_id': 'unknown',
                         'solar_system_id': 'unknown',
                         'type_id': 'unknown',
@@ -440,7 +440,7 @@ class AssetManager(metaclass=SingletonMeta):
             structure_node = {
                 'structure_id': forbidden_structure_node["item_id"],
                 'structure_name': structure_info["name"],
-                'structure_type': SdeUtils.get_name_by_id(structure_info['type_id']) if structure_info['type_id'] != 'unknown' else 'unknown',
+                'structure_type': await SdeUtils.get_name_by_id(structure_info['type_id']) if structure_info['type_id'] != 'unknown' else 'unknown',
                 'structure_type_id': structure_info['type_id'] if structure_info['type_id'] != 'unknown' else 'unknown',
                 'system_id': solar_system_node['system_id'],
                 'system_name': solar_system_node['system_name'],
@@ -472,7 +472,7 @@ class AssetManager(metaclass=SingletonMeta):
                 structure_info = await eveesi.universe_structures_structure(access_character.ac_token, node["item_id"])
                 if structure_info:
                     logger.info(f"建筑{node["item_id"]} 获取到建筑信息")
-                    system_info = SdeUtils.get_system_info_by_id(structure_info["solar_system_id"])
+                    system_info = await SdeUtils.get_system_info_by_id(structure_info["solar_system_id"])
                     structure_info_cache = {
                         "name": structure_info["name"],
                         "owner_id": structure_info["owner_id"],
@@ -486,7 +486,7 @@ class AssetManager(metaclass=SingletonMeta):
                 else:
                     logger.info(f"建筑{node["item_id"]}无权限，创建无权限建筑")
                     structure_info_cache = {
-                        'name': f'Forbidden {SdeUtils.get_name_by_id(node['type_id'])}',
+                        'name': f'Forbidden {await SdeUtils.get_name_by_id(node['type_id'])}',
                         'owner_id': 'unknown',
                         'solar_system_id': 'unknown',
                         'type_id': 'unknown',
@@ -504,7 +504,7 @@ class AssetManager(metaclass=SingletonMeta):
             structure_node = {
                 'structure_id': node["item_id"],
                 'structure_name': structure_info["name"],
-                'structure_type': SdeUtils.get_name_by_id(structure_info['type_id']) if structure_info['type_id'] != 'unknown' else 'unknown',
+                'structure_type': await SdeUtils.get_name_by_id(structure_info['type_id']) if structure_info['type_id'] != 'unknown' else 'unknown',
                 'structure_type_id': structure_info['type_id'] if structure_info['type_id'] != 'unknown' else 'unknown',
                 'system_id': structure_info['system_id'],
                 'system_name': structure_info['system_name'],
@@ -549,7 +549,7 @@ class AssetManager(metaclass=SingletonMeta):
         await NAU.delete_assets_by_owner_id(owner_id)
 
     async def search_container_by_item_name(self, user_name, item_name: str):
-        type_id = SdeUtils.get_id_by_name(item_name)
+        type_id = await SdeUtils.get_id_by_name(item_name)
         # 获得用户能访问的所有资产所有者id
         owner_id_list = []
         async for mission in await EveAssetPullMissionDBUtils.select_all_by_user_name(user_name):

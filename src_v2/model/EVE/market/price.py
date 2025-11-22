@@ -1,4 +1,4 @@
-from ..sde_service.utils import SdeUtils
+from ..sde import SdeUtils
 from ..market_server.market_manager import MarketManager
 
 from ...utils import KahunaException
@@ -18,17 +18,17 @@ class PriceService:
         if item_str in SdeUtils.item_map_dict:
             item_str = SdeUtils.item_map_dict[item_str]
         # 找不到id时获取模糊匹配结果并返回给用户
-        if (type_id := SdeUtils.get_id_by_name(item_str)) is None:
-            fuzz_list = SdeUtils.fuzz_type(item_str)
+        if (type_id := await SdeUtils.get_id_by_name(item_str)) is None:
+            fuzz_list = await SdeUtils.fuzz_type(item_str)
             # 进行忽略大小写的匹配
             for item in fuzz_list:
                 if SdeUtils.maybe_chinese(item_str):
                     if len(item_str) == len(item) or item_str in item:
-                        type_id = SdeUtils.get_id_by_name(item)
+                        type_id = await SdeUtils.get_id_by_name(item)
                         break
                 else:
                     if item_str.lower() == item.lower():
-                        type_id = SdeUtils.get_id_by_name(item)
+                        type_id = await SdeUtils.get_id_by_name(item)
                         break
             if type_id is None:
                 return None, None, None, None, fuzz_list

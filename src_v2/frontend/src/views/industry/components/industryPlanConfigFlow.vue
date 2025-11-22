@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { http } from '@/http'
 import IndustryPlanConfigFlowTable from './industryPlanConfigFlowTable.vue'
 import { ElMessage } from 'element-plus'
 import { VueDraggable } from 'vue-draggable-plus'
 import { haveRole } from '@/router/guards'
+import { useAuthStore } from '@/stores/auth'
 
+const authStore = useAuthStore()
 interface Props {
     selectedPlan: string
 }
+
+const haveAlphaRole = computed(() => {
+    console.log("roles", authStore.user?.roles)
+    return authStore.user?.roles.includes('vip_alpha') || false
+})
 
 const configTypeMap = ref<{ [key: string]: string }>({
   "StructureRigConfig": "建筑插件",
@@ -509,10 +516,10 @@ watch(
     <el-button @click="getConfigFlowList">
         重置修改
     </el-button>
-    <el-button>
+    <el-button disabled>
         保存为预设
     </el-button>
-    <el-button>
+    <el-button disabled>
         从预设加载
     </el-button>
 </div>
@@ -592,7 +599,7 @@ watch(
             <el-radio-button label="建筑分配" value="StructureAssignConf" />
             <el-radio-button label="原材料标记" value="MaterialTagConf" />
             <el-radio-button label="缺省蓝图参数" value="DefaultBlueprintConf" />
-            <el-radio-button label="载入库存" value="LoadAssetConf" :disabled="haveRole('vip_alpha')"/>
+            <el-radio-button label="载入库存" value="LoadAssetConf" :disabled="!haveAlphaRole"/>
             <el-radio-button label="最大作业拆分控制" value="MaxJobSplitCountConf" />
         </el-radio-group>
 

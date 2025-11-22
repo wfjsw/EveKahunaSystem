@@ -1,13 +1,22 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import SidebarLayout from '../components/SidebarLayout.vue'
 import settingSidebar from '../components/sideBar/mainSidebar.vue'
+import { useAuthStore } from '@/stores/auth'
 
-const menuItems = ref([
-  { index: 1, label: '角色设置', route: '/setting/characterSetting'},
-  { index: 2, label: '工业配置', route: '/setting/industrySetting'},
-  { index: 3, label: '账号配置', route: '/setting/accountSetting'}
-])
+const authStore = useAuthStore()
+const haveAlphaRole = computed(() => {
+    return authStore.user?.roles.includes('vip_alpha') || false
+})
+
+const menuItems = computed(() => {
+    const items: {index: number, label: string, route: string}[] = []
+    if (haveAlphaRole.value) {
+        items.push({ index: 1, label: '角色设置', route: '/setting/characterSetting'})
+    }
+    items.push({ index: 2, label: '账号配置', route: '/setting/accountSetting'})
+    return items
+})
 
 </script>
 

@@ -8,7 +8,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from src_v2.core.permission.permission_manager import permission_manager
 from src_v2.core.user.user_manager import UserManager
-from src.service.log_server import logger
+from src_v2.core.log import logger
 from src_v2.model.EVE.character.character_manager import CharacterManager
 from src_v2.core.utils import KahunaException
 
@@ -27,8 +27,6 @@ api_auth_bp = Blueprint('api_auth', __name__, url_prefix='/api/auth')
 #     }
 # }
 
-INVITE_CODE = '123456'
-
 @api_auth_bp.route('/signup', methods=['POST'])
 async def signup():
     try:
@@ -40,14 +38,28 @@ async def signup():
         invite_code = data.get('inviteCode')
         logger.debug(f"invite_code: {invite_code}")
 
-        if invite_code != INVITE_CODE:
-            return jsonify({"status": 400, "message": "邀请码错误"}), 400
+        if not invite_code:
+            return jsonify({"status": 400, "message": "邀请码不能为空"}), 400
 
+        # 校验邀请码
+        validation_result = await permission_manager.validate_invite_code(invite_code)
+        if not validation_result.get('valid'):
+            return jsonify({"status": 400, "message": "邀请码不存在"}), 400
+        
+        if not validation_result.get('available'):
+            return jsonify({"status": 400, "message": "邀请码已使用完"}), 400
+
+        # 创建用户
         pass_hash = generate_password_hash(password)
         user = await UserManager().create_user(user_name=username, passwd_hash=pass_hash)
         await permission_manager.add_role_to_user(username, 'user')
+        
+        # 使用邀请码（记录使用历史）
+        await permission_manager.use_invite_code(invite_code, username)
 
         return jsonify({"status": 200, "message": "注册成功"})
+    except ValueError as e:
+        return jsonify({"status": 400, "message": str(e)}), 400
     except KahunaException as e:
         return jsonify({"status": 500, "message": str(e)}), 500
     except Exception as e:
@@ -82,6 +94,14 @@ async def login():
         if not user:
             raise KeyError
         token = create_token(username, ",".join(await user.roles))
+        roles = await user.roles
+        # 获取vip等级
+        vip_state = await permission_manager.get_vip_state(username)
+        if vip_state:
+            logger.info(f"vip_state: {vip_state.vip_level}")
+            roles.append(vip_state.vip_level)
+        else:
+            logger.info(f"vip_state: None")
 
         return jsonify({
             "status": 200,
@@ -89,7 +109,7 @@ async def login():
             "user": {
                 "id": username,
                 "username": username,
-                "roles": await user.roles
+                "roles": list(set(roles))
             }
         })
     except KahunaException as e:
@@ -108,11 +128,20 @@ async def get_current_user():
         if not user:
             return jsonify({"status": 404, "message": "用户不存在"}), 404
 
+        # 获取vip等级
+        roles = await user.roles
+        vip_state = await permission_manager.get_vip_state(user_id)
+        if vip_state:
+            logger.info(f"vip_state: {vip_state.vip_level}")
+            roles.append(vip_state.vip_level)
+        else:
+            logger.info(f"vip_state: None")
+
         return jsonify({
             "status": 200,
             "id": user.user_name,
             "username": user.user_name,
-            "roles": await user.roles,
+            "roles": list(set(roles)),
         })
     except KahunaException as e:
         return jsonify({"status": 500, "message": str(e)}), 500

@@ -1,7 +1,7 @@
 from quart import request, jsonify, g, Blueprint
 from src_v2.backend.auth import auth_required
 from src_v2.backend.api.permission_required import permission_required
-from src.service.log_server import logger
+from src_v2.core.log import logger
 import traceback
 from src_v2.core.utils import KahunaException
 from src_v2.core.permission.permission_manager import permission_manager

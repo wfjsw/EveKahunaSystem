@@ -5,7 +5,8 @@ import settingSidebar from '../components/sideBar/mainSidebar.vue'
 
 const menuItems = ref([
   { index: 1, label: '用户管理', route: '/admin/userManagement'},
-  { index: 2, label: '权限管理', route: '/admin/permissionManagement'}
+  { index: 2, label: '权限管理', route: '/admin/permissionManagement'},
+  { index: 3, label: '邀请码管理', route: '/admin/inviteCodeManagement'}
 ])
 
 </script>

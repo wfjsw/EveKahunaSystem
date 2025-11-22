@@ -2,7 +2,7 @@ import asyncio
 from enum import Enum
 
 # Kahuna model
-from ..sde_service.utils import SdeUtils
+from ..sde import SdeUtils
 from ..character_server.character_manager import CharacterManager
 from ..industry_server.structure import StructureManager
 from ..log_server import logger
@@ -49,7 +49,7 @@ class AssetContainer:
 
     @classmethod
     async def find_secret_data(cls, secret_type: str) -> list:
-        item_id = SdeUtils.get_id_by_name(secret_type)
+        item_id = await SdeUtils.get_id_by_name(secret_type)
         if not item_id:
             return []
         find_list = await AssetCacheDBUtils.select_asset_by_type_id(item_id)
@@ -92,7 +92,7 @@ class AssetContainer:
             info.update({
                 'location_id': data[0],
                 'location_flag': data[1],
-                'structure_type': SdeUtils.get_name_by_id(info['type_id']),
+                'structure_type': await SdeUtils.get_name_by_id(info['type_id']),
                 'exist_quantity': data[3],
 
             })

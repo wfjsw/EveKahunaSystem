@@ -25,7 +25,7 @@ const formatAccounting = (value: number | string | null | undefined): string => 
 
 // 行样式函数
 const CompleteRowClassName = (data: { row: any, rowIndex: number }) => {
-    return data.row.real_quantity <= 0 ? 'complete-job' : 'full'
+    return data.row.real_quantity <= 0 ? 'complete-row' : 'full'
 }
 
 // 复制单元格内容
@@ -75,6 +75,7 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
 
 <template>
     <el-table
+        class="flow-data-table"
         :data="flowData"
         :key="`flow-table-${selectedPlan || 'default'}`"
         row-key="type_id"
@@ -136,7 +137,7 @@ const copyCellContent = async (content: string | number | null | undefined, fiel
 </template>
 
 <style scoped>
-:deep(.el-table .complete-job) {
+:deep(.el-table__body tr.complete-row) {
     background-color: #e7ffc8 !important;
     font-weight: bold !important;
     color: #000000 !important;

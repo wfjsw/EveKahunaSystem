@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 from neo4j import AsyncGraphDatabase
+from neo4j.exceptions import TransactionError
 
 from redis.asyncio import Redis
 
@@ -1042,11 +1043,26 @@ class Neo4jDatabaseManager():
             try:
                 yield tx
                 await tx.commit()
-            except Exception:
-                await tx.rollback()
+            except Exception as e:
+                # 检查事务是否已关闭（例如死锁时 Neo4j 会自动关闭事务）
+                # 如果事务已关闭，尝试 rollback 会抛出 TransactionError
+                try:
+                    await tx.rollback()
+                except TransactionError:
+                    # 事务已关闭（例如由于死锁），这是正常情况，不需要回滚
+                    # 记录调试信息但不抛出异常
+                    logger.debug(f"Neo4j 事务已关闭，跳过回滚: {type(e).__name__}")
+                except Exception as rollback_error:
+                    # 其他类型的回滚错误，记录警告
+                    logger.warning(f"Neo4j 事务回滚失败: {rollback_error}")
                 raise
             finally:
-                await tx.close()
+                # 确保关闭事务，即使已经关闭也不会出错
+                try:
+                    await tx.close()
+                except (TransactionError, Exception):
+                    # 事务可能已经关闭，忽略关闭错误
+                    pass
 
     async def close(self):
         """关闭 Neo4j 连接"""

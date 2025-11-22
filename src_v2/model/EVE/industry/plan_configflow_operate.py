@@ -255,19 +255,19 @@ class ConfigFlowOperateCenter():
                 "character_name": character_public_info.name,
                 "character_title": character_public_info.title,
                 "activity_name": activity_name,
-                "product_type_name": SdeUtils.get_cn_name_by_id(job['product_type_id']),
+                "product_type_name": await SdeUtils.get_cn_name_by_id(job['product_type_id']),
                 **job
             })
 
         return installer_data
 
     async def _is_match_keyword(self, conf_list, type_id: int):
-        group_list = [SdeUtils.get_groupname_by_id(type_id), SdeUtils.get_groupname_by_id(type_id, zh=True)]
-        meta_list = [SdeUtils.get_metaname_by_typeid(type_id), SdeUtils.get_metaname_by_typeid(type_id, zh=True)]
+        group_list = [await SdeUtils.get_groupname_by_id(type_id), await SdeUtils.get_groupname_by_id(type_id, zh=True)]
+        meta_list = [await SdeUtils.get_metaname_by_typeid(type_id), await SdeUtils.get_metaname_by_typeid(type_id, zh=True)]
         bp_name_list = [await BPM.get_bp_name_by_typeid(type_id), await BPM.get_bp_name_by_typeid(type_id, zh=True)]
-        category_list = [SdeUtils.get_category_by_id(type_id), SdeUtils.get_category_by_id(type_id, zh=True)]
-        market_group_list = SdeUtils.get_market_group_list(type_id)
-        market_group_list.extend(SdeUtils.get_market_group_list(type_id, zh=True))
+        category_list = [await SdeUtils.get_category_by_id(type_id), await SdeUtils.get_category_by_id(type_id, zh=True)]
+        market_group_list = await SdeUtils.get_market_group_list(type_id)
+        market_group_list.extend(await SdeUtils.get_market_group_list(type_id, zh=True))
 
         for config in conf_list:
             match = True

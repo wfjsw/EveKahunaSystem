@@ -34,7 +34,6 @@ from src_v2.model.EVE.character import CharacterManager
 from src_v2.model.EVE.eveesi import eveesi
 from src_v2.model.EVE.market.market_manager import MarketManager
 from src_v2.model.EVE.sde import SdeUtils
-from src_v2.model.EVE.sde.database import InvTypes, MarketGroups
 
 # 本地导入 - 相对导入
 from .blueprint import BPManager as BPM
@@ -104,8 +103,8 @@ class IndustryManager(metaclass=SingletonMeta):
         
         async for product in await EveIndustryPlanProductDBUtils.select_all_by_user_name(user_name):
             logger.info(f"获取计划表格数据: {product.plan_name} {product.product_type_id} {product.quantity}")
-            type_name = SdeUtils.get_name_by_id(product.product_type_id)
-            type_name_zh = SdeUtils.get_cn_name_by_id(product.product_type_id)
+            type_name = await SdeUtils.get_name_by_id(product.product_type_id)
+            type_name_zh = await SdeUtils.get_cn_name_by_id(product.product_type_id)
             plan_list[product.plan_name]["products"].append({
                 "row_id": await row_id_counter.next_node(),
                 "index_id": product.index_id,
@@ -252,7 +251,7 @@ class IndustryManager(metaclass=SingletonMeta):
             await cls._create_plan_bp_tree(plan_user_dict, product, counter)
             mission_count = await tqdm_manager.update_mission(f"create_plan_{plan_name}", 1)
             now_progress = mission_count / len(products) * 100
-            if now_progress > last_progress + 10:
+            if now_progress > last_progress + 1:
                 await rdm.r.hset(op.current_progress_key, mapping={"name": "创建计划树", "progress": now_progress})
                 last_progress = now_progress
 
@@ -321,7 +320,7 @@ class IndustryManager(metaclass=SingletonMeta):
                     eiv_cost_dict[top_product_type_id] = {
                         "eiv_cost": 0,
                         "type_id": top_product_type_id,
-                        "type_name": SdeUtils.get_name_by_id(top_product_type_id),
+                        "type_name": await SdeUtils.get_name_by_id(top_product_type_id),
                         "index_id": relation["index_id"],
                         "product_num": op.product_num_dict[top_product_type_id],
                         "children": [],
@@ -332,10 +331,10 @@ class IndustryManager(metaclass=SingletonMeta):
                 })
                 if op.get_node_type(relation['material']) != "product":
                     material_type_node = await cls._get_material_type(relation['material'])
-                    jita_buy_price = await rdm.r.hget(f"market:price:jita:{relation['material']}", "max_buy")
+                    jita_buy_price = await rdm.r.hget(f"market_price:jita:{relation['material']}", "max_buy")
                     eiv_cost_dict[top_product_type_id]['children'].append({
                         "type_id": relation['material'],
-                        "type_name": SdeUtils.get_name_by_id(relation['material']),
+                        "type_name": await SdeUtils.get_name_by_id(relation['material']),
                         "index_id": relation["index_id"],
                         "quantity": relation['quantity'],
                         "jita_buy_price": jita_buy_price if jita_buy_price else 0,
@@ -397,11 +396,11 @@ class IndustryManager(metaclass=SingletonMeta):
         await tqdm_manager.add_mission(f"分类节点 {plan_name}", len(node_dict))
         for node in node_dict.values():
             # 整理库存状态
-            node['tpye_name_zh'] = SdeUtils.get_cn_name_by_id(node['type_id'])
+            node['tpye_name_zh'] = await SdeUtils.get_cn_name_by_id(node['type_id'])
             if op.get_node_type(node['type_id']) != "product":
                 material_type_node = await cls._get_material_type(node['type_id'])
-                buy_price = await rdm.r.hget(f"market:price:jita:{node['type_id']}", "max_buy")
-                sell_price = await rdm.r.hget(f"market:price:jita:{node['type_id']}", "min_sell")
+                buy_price = await rdm.r.hget(f"market_price:jita:{node['type_id']}", "max_buy")
+                sell_price = await rdm.r.hget(f"market_price:jita:{node['type_id']}", "min_sell")
                 node['buy_price'] = buy_price if buy_price else 0
                 node['sell_price'] = sell_price if sell_price else 0
                 material_output[material_type_node]['children'].append(node)
@@ -409,15 +408,15 @@ class IndustryManager(metaclass=SingletonMeta):
                 flow_output[node['max_distance'] - 1]["children"].append(node)
             mission_count = await tqdm_manager.update_mission(f"分类节点 {plan_name}", 1)
             now_progress = mission_count / len(node_dict) * 100
-            if now_progress / 3 + 66 > last_progress + 10:
+            if now_progress / 3 + 66 > last_progress + 1:
                 last_progress = now_progress
             
             # 整理工作流输出
             work_flow.extend([{
                     "type_id": work["type_id"],
                     "active_id": await BPM.get_activity_id_by_product_typeid(work["type_id"]),
-                    "type_name_zh": SdeUtils.get_cn_name_by_id(work["type_id"]),
-                    "type_name": SdeUtils.get_name_by_id(work["type_id"]),
+                    "type_name_zh": await SdeUtils.get_cn_name_by_id(work["type_id"]),
+                    "type_name": await SdeUtils.get_name_by_id(work["type_id"]),
                     "avaliable": work["avaliable"],
                     "runs": work["runs"],
                     "bp_object": work["bp_object"],
@@ -502,8 +501,8 @@ class IndustryManager(metaclass=SingletonMeta):
             provide_structure_info = logistic_info["provide_structure_info"]
             lack_structure_info = logistic_info["lack_structure_info"]
             light_year = 9.461e15
-            provide_system_info = SdeUtils.get_system_info_by_id(provide_structure_info["system_id"])
-            lack_system_info = SdeUtils.get_system_info_by_id(lack_structure_info["system_id"])
+            provide_system_info = await SdeUtils.get_system_info_by_id(provide_structure_info["system_id"])
+            lack_system_info = await SdeUtils.get_system_info_by_id(lack_structure_info["system_id"])
             save_logistic_data.append({
                 "lack_structure_id": lack_structure_id,
                 "lack_structure_name": lack_structure_info["structure_name"],
@@ -521,9 +520,9 @@ class IndustryManager(metaclass=SingletonMeta):
                     (provide_system_info["z"] - lack_system_info["z"])**2
                 ) / light_year,
                 "lack_type_id": lack_type_id,
-                "lack_type_name": SdeUtils.get_cn_name_by_id(lack_type_id),
+                "lack_type_name": await SdeUtils.get_cn_name_by_id(lack_type_id),
                 "provide_quantity": logistic_info["provide_quantity"],
-                "provide_volume": SdeUtils.get_volume_by_type_id(lack_type_id) * logistic_info["provide_quantity"],
+                "provide_volume": await SdeUtils.get_volume_by_type_id(lack_type_id) * logistic_info["provide_quantity"],
             })
 
 
@@ -576,7 +575,7 @@ class IndustryManager(metaclass=SingletonMeta):
         # 查询所有Blueprint节点和BP_DEPEND_ON关系
         # 使用MATCH找到根节点及其所有子节点
         nodes_dict, relationships_list = await NIU.get_blueprint_tree(type_id)
-        type_name = SdeUtils.get_cn_name_by_id(type_id)
+        type_name = await SdeUtils.get_cn_name_by_id(type_id)
         await tqdm_manager.add_mission(f"create_plan_bp_tree_{type_id}_{type_name}_nodes", len(nodes_dict))
         await tqdm_manager.add_mission(f"create_plan_bp_tree_{type_id}_{type_name}_relationships", len(relationships_list))
 
@@ -888,7 +887,7 @@ class IndustryManager(metaclass=SingletonMeta):
         # 系数成本计算 ==============================================================================================
         structure_info = await op.get_type_assign_structure_info(product_type_id)
         if not structure_info:
-            # raise KahunaException(f"物品 {product_type_id}: {SdeUtils.get_name_by_id(product_type_id)} 未分配建筑")
+            # raise KahunaException(f"物品 {product_type_id}: {await SdeUtils.get_name_by_id(product_type_id)} 未分配建筑")
             system_cost = {"manufacturing": 0.14 / 100, "reaction": 0.14 / 100}
         else:
             system_cost = await op.get_system_cost(structure_info['system_id'])
@@ -1011,7 +1010,7 @@ class IndustryManager(metaclass=SingletonMeta):
             all_relation_list = await NIU.get_relations("PLAN_BP_DEPEND_ON", {"user_name": user_name, "plan_name": plan_name})
             mission_count = await tqdm_manager.get_mission_count("relation_moniter_process")
             now_progress = mission_count / len(all_relation_list) * 100
-            if now_progress > last_progress + 10:
+            if now_progress > last_progress + 1:
                 await rdm.r.hset(op.current_progress_key, mapping={"name": "更新树状态", "progress": now_progress, "is_indeterminate": 0})
                 last_progress = now_progress
         await tqdm_manager.complete_mission("relation_moniter_process")
