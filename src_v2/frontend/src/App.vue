@@ -90,7 +90,7 @@ const handleLogout = () => {
       <el-container class="main-container">
         <el-header class="main-header">
           <div class="header-content">
-            <h2>Kahuna-System</h2>
+            <h2>Kahuna-System V1.0.0</h2>
             <div class="header-actions">
               <!-- GitHub 按钮 -->
               <el-button
@@ -140,7 +140,7 @@ const handleLogout = () => {
         </el-main>
         
         <el-footer class="main-footer">
-          <span>© 2024 Kahuna Bot. All rights reserved.</span>
+          <span>© 2025 Kahuna Kahuna-System. 紫竹梅重工.</span>
         </el-footer>
       </el-container>
     </el-container>
