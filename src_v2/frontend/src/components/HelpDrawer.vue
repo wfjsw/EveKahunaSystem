@@ -1,6 +1,84 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useHelpStore } from '@/stores/help'
+import { marked } from 'marked'
+
+// 导入图片资源
+import docIndustry1 from '@/assets/doc-industry-1.png'
+import docIndustry2 from '@/assets/doc-industry-2.png'
+import docIndustry3 from '@/assets/doc-industry-3.png'
+import docStorage1 from '@/assets/doc-storage-1.png'
+import docStorage2 from '@/assets/doc-storage-2.png'
+import docStorage3 from '@/assets/doc-storage-3.png'
+import docSetting1 from '@/assets/doc-setting-1.png'
+
+// 创建图片路径映射
+const imageMap: Record<string, string> = {
+  '/assets/doc-industry-1.png': docIndustry1,
+  '/assets/doc-industry-2.png': docIndustry2,
+  '/assets/doc-industry-3.png': docIndustry3,
+  '/assets/doc-storage-1.png': docStorage1,
+  '/assets/doc-storage-2.png': docStorage2,
+  '/assets/doc-storage-3.png': docStorage3,
+  '/assets/doc-setting-1.png': docSetting1
+}
+
+// 配置 marked
+marked.setOptions({
+  breaks: true, // 支持换行
+  gfm: true,    // GitHub Flavored Markdown
+})
+
+// 全屏图片查看状态
+const imageViewerVisible = ref(false)
+const imageViewerSrc = ref('')
+
+// 打开图片查看器
+const openImageViewer = (src: string) => {
+  imageViewerSrc.value = src
+  imageViewerVisible.value = true
+}
+
+// 关闭图片查看器
+const closeImageViewer = () => {
+  imageViewerVisible.value = false
+  imageViewerSrc.value = ''
+}
+
+// 转义 HTML 属性值
+const escapeHtml = (str: string): string => {
+  const div = document.createElement('div')
+  div.textContent = str
+  return div.innerHTML
+}
+
+// 自定义图片渲染器
+const renderer = new marked.Renderer()
+const originalImage = renderer.image.bind(renderer)
+renderer.image = (href: string, title: string | null, text: string) => {
+  // 如果图片路径在映射中，使用映射的路径
+  const imageSrc = imageMap[href] || href
+  // 转义属性值
+  const altText = escapeHtml(text || '')
+  const titleText = escapeHtml(title || text || '')
+  // 添加可点击的样式类和 data 属性
+  return `<img src="${imageSrc}" alt="${altText}" title="${titleText}" class="clickable-image" data-image-src="${imageSrc}" style="cursor: pointer;" />`
+}
+
+// 导入 markdown 文件（使用 ?raw 后缀）
+import summaryWhatIsKahunaSystem from '@/docs/summary-what-is-kahuna-system.md?raw'
+const summaryWhatIsKahunaSystemHtml = marked(summaryWhatIsKahunaSystem, { renderer }) as string
+import summaryPrice from '@/docs/summary-price.md?raw'
+const summaryPriceHtml = marked(summaryPrice, { renderer }) as string
+import summaryQA from '@/docs/summary-QA.md?raw'
+const summaryQAHtml = marked(summaryQA, { renderer }) as string
+
+import gettingStartIndustry from '@/docs/getting-start-industry.md?raw'
+const gettingStartIndustryHtml = marked(gettingStartIndustry, { renderer }) as string
+import gettingStartStorage from '@/docs/getting-start-storage.md?raw'
+const gettingStartStorageHtml = marked(gettingStartStorage, { renderer }) as string
+import gettingStartSetting from '@/docs/getting-start-setting.md?raw'
+const gettingStartSettingHtml = marked(gettingStartSetting, { renderer }) as string
 
 const helpStore = useHelpStore()
 
@@ -12,37 +90,126 @@ interface HelpSection {
   content?: string
 }
 
-// 示例目录结构（等待用户填充内容）
+// 目录结构（从 markdown 文件加载内容）
 const helpSections = ref<HelpSection[]>([
   {
     id: 'intro',
-    title: '系统介绍',
+    title: '简介',
     children: [
-      { id: 'intro-overview', title: '系统概述', content: '系统概述内容待填充...' },
-      { id: 'intro-features', title: '核心功能', content: '核心功能内容待填充...' }
+      { id: 'intro-overview', title: '什么是 Kahuna System？', content: summaryWhatIsKahunaSystemHtml },
+      { id: 'intro-price', title: '关于收费', content: summaryPriceHtml },
+      { id: 'intro-QA', title: '常见问题', content: summaryQAHtml }
     ]
   },
   {
     id: 'getting-started',
     title: '快速开始',
     children: [
-      { id: 'getting-started-install', title: '安装配置', content: '安装配置内容待填充...' },
-      { id: 'getting-started-first-use', title: '首次使用', content: '首次使用内容待填充...' }
-    ]
-  },
-  {
-    id: 'features',
-    title: '功能说明',
-    children: [
-      { id: 'features-industry', title: '工业规划', content: '工业规划功能说明待填充...' },
-      { id: 'features-market', title: '市场分析', content: '市场分析功能说明待填充...' }
+      { id: 'getting-started-industry', title: '工业', content: gettingStartIndustryHtml },
+      { id: 'getting-started-storage', title: '库存管理【Alpha订阅】', content: gettingStartStorageHtml },
+      { id: 'getting-started-setting', title: '设置', content: gettingStartSettingHtml }
     ]
   }
 ])
 
+// localStorage 键名
+const STORAGE_KEY_ACTIVE_SECTION = 'help-drawer-active-section'
+const STORAGE_KEY_ACTIVE_SUB_SECTION = 'help-drawer-active-sub-section'
+const STORAGE_KEY_OPENED_SECTIONS = 'help-drawer-opened-sections'
+
+// 验证 section ID 是否有效
+const isValidSectionId = (sectionId: string): boolean => {
+  return helpSections.value.some(s => s.id === sectionId)
+}
+
+// 验证 subSection ID 是否有效
+const isValidSubSectionId = (subSectionId: string): boolean => {
+  for (const section of helpSections.value) {
+    if (section.children?.some(child => child.id === subSectionId)) {
+      return true
+    }
+  }
+  return false
+}
+
+// 从 localStorage 加载保存的状态
+const loadSavedState = () => {
+  try {
+    const savedSectionId = localStorage.getItem(STORAGE_KEY_ACTIVE_SECTION)
+    const savedSubSectionId = localStorage.getItem(STORAGE_KEY_ACTIVE_SUB_SECTION)
+    const savedOpenedSections = localStorage.getItem(STORAGE_KEY_OPENED_SECTIONS)
+
+    // 验证并恢复一级目录
+    if (savedSectionId && isValidSectionId(savedSectionId)) {
+      let sectionId = savedSectionId
+      let subSectionId = ''
+      let openedSectionsList: string[] = []
+
+      // 如果保存了 subSectionId，验证其有效性并找到对应的 sectionId
+      if (savedSubSectionId && isValidSubSectionId(savedSubSectionId)) {
+        subSectionId = savedSubSectionId
+        // 找到 subSection 对应的 section
+        for (const section of helpSections.value) {
+          if (section.children?.some(child => child.id === savedSubSectionId)) {
+            sectionId = section.id
+            break
+          }
+        }
+      }
+
+      // 恢复展开的目录列表
+      if (savedOpenedSections) {
+        try {
+          openedSectionsList = JSON.parse(savedOpenedSections).filter((id: string) => isValidSectionId(id))
+        } catch {
+          openedSectionsList = []
+        }
+      }
+
+      // 确保当前激活的 section 在展开列表中
+      if (sectionId && !openedSectionsList.includes(sectionId)) {
+        openedSectionsList.push(sectionId)
+      }
+
+      return {
+        sectionId,
+        subSectionId,
+        openedSections: openedSectionsList.length > 0 ? openedSectionsList : [sectionId]
+      }
+    }
+  } catch (error) {
+    console.warn('加载保存的状态失败:', error)
+  }
+  return null
+}
+
+// 保存状态到 localStorage
+const saveState = () => {
+  try {
+    localStorage.setItem(STORAGE_KEY_ACTIVE_SECTION, activeSectionId.value)
+    localStorage.setItem(STORAGE_KEY_ACTIVE_SUB_SECTION, activeSubSectionId.value)
+    localStorage.setItem(STORAGE_KEY_OPENED_SECTIONS, JSON.stringify(openedSections.value))
+  } catch (error) {
+    console.warn('保存状态失败:', error)
+  }
+}
+
+// 初始化状态（从 localStorage 或使用默认值）
+const savedState = loadSavedState()
+const defaultSectionId = helpSections.value[0]?.id || ''
+const defaultSubSectionId = helpSections.value[0]?.children?.[0]?.id || ''
+
 // 当前选中的目录项
-const activeSectionId = ref<string>(helpSections.value[0]?.id || '')
-const activeSubSectionId = ref<string>(helpSections.value[0]?.children?.[0]?.id || '')
+const activeSectionId = ref<string>(savedState?.sectionId || defaultSectionId)
+const activeSubSectionId = ref<string>(savedState?.subSectionId || defaultSubSectionId)
+
+// 已展开的一级目录列表
+const openedSections = ref<string[]>(savedState?.openedSections || [defaultSectionId])
+
+// 监听状态变化并保存
+watch([activeSectionId, activeSubSectionId, openedSections], () => {
+  saveState()
+}, { deep: true })
 
 // 当前显示的内容
 const currentContent = computed(() => {
@@ -68,21 +235,91 @@ const handleSectionClick = (sectionId: string) => {
   const section = helpSections.value.find(s => s.id === sectionId)
   if (section?.children && section.children.length > 0) {
     activeSubSectionId.value = section.children[0].id
+    // 确保该一级目录在展开列表中
+    if (!openedSections.value.includes(sectionId)) {
+      openedSections.value.push(sectionId)
+    }
   } else {
     activeSubSectionId.value = ''
   }
 }
 
-// 处理二级目录点击
-const handleSubSectionClick = (subSectionId: string) => {
-  activeSubSectionId.value = subSectionId
+// 处理菜单选择事件（包括一级和二级目录）
+const handleMenuSelect = (index: string) => {
+  // 检查是否是一级目录
+  const section = helpSections.value.find(s => s.id === index)
+  if (section) {
+    // 如果是一级目录，切换到第一个子项
+    handleSectionClick(index)
+  } else {
+    // 如果是二级目录，直接切换
+    activeSubSectionId.value = index
+    // 同时更新对应的一级目录，并确保该一级目录保持展开
+    for (const sec of helpSections.value) {
+      if (sec.children?.some(child => child.id === index)) {
+        activeSectionId.value = sec.id
+        // 确保该一级目录在展开列表中
+        if (!openedSections.value.includes(sec.id)) {
+          openedSections.value.push(sec.id)
+        }
+        break
+      }
+    }
+  }
 }
+
+// 处理子菜单展开/收起事件
+const handleSubMenuOpen = (index: string) => {
+  if (!openedSections.value.includes(index)) {
+    openedSections.value.push(index)
+  }
+}
+
+const handleSubMenuClose = (index: string) => {
+  const idx = openedSections.value.indexOf(index)
+  if (idx > -1) {
+    openedSections.value.splice(idx, 1)
+  }
+}
+
+// 为图片添加点击事件
+const setupImageClickHandlers = () => {
+  nextTick(() => {
+    const contentElement = document.querySelector('.help-content-text')
+    if (contentElement) {
+      const images = contentElement.querySelectorAll('img.clickable-image')
+      images.forEach((img) => {
+        // 移除旧的事件监听器（如果存在）
+        const newImg = img.cloneNode(true) as HTMLElement
+        img.parentNode?.replaceChild(newImg, img)
+        
+        // 添加点击事件
+        newImg.addEventListener('click', () => {
+          const src = newImg.getAttribute('data-image-src') || newImg.getAttribute('src') || ''
+          if (src) {
+            openImageViewer(src)
+          }
+        })
+      })
+    }
+  })
+}
+
+// 监听内容变化，重新设置图片点击事件
+watch(currentContent, () => {
+  setupImageClickHandlers()
+})
+
+// 组件挂载时设置图片点击事件
+onMounted(() => {
+  setupImageClickHandlers()
+})
 </script>
 
 <template>
   <el-drawer
     v-model="helpStore.isOpen"
-    title="使用说明"
+    title="指南"
     :size="800"
     direction="rtl"
     :before-close="helpStore.closeHelp"
@@ -92,16 +329,19 @@ const handleSubSectionClick = (subSectionId: string) => {
       <div class="help-sidebar">
         <el-scrollbar>
           <el-menu
+            :key="`menu-${activeSubSectionId || activeSectionId}-${openedSections.join(',')}`"
             :default-active="activeSubSectionId || activeSectionId"
             class="help-menu"
-            @select="handleSubSectionClick"
-            :default-openeds="[activeSectionId]"
+            @select="handleMenuSelect"
+            :default-openeds="openedSections"
+            @open="handleSubMenuOpen"
+            @close="handleSubMenuClose"
           >
             <template v-for="section in helpSections" :key="section.id">
               <!-- 一级目录 -->
-              <el-sub-menu :index="section.id" @click="handleSectionClick(section.id)">
+              <el-sub-menu :index="section.id">
                 <template #title>
-                  <span>{{ section.title }}</span>
+                  <span @click.stop="handleSectionClick(section.id)">{{ section.title }}</span>
                 </template>
                 <!-- 二级目录 -->
                 <el-menu-item
@@ -109,7 +349,7 @@ const handleSubSectionClick = (subSectionId: string) => {
                   :key="child.id"
                   :index="child.id"
                 >
-                  {{ child.title }}
+                  <span>{{ child.title }}</span>
                 </el-menu-item>
               </el-sub-menu>
             </template>
@@ -126,6 +366,22 @@ const handleSubSectionClick = (subSectionId: string) => {
         </el-scrollbar>
       </div>
     </div>
+
+    <!-- 全屏图片查看器 -->
+    <el-dialog
+      v-model="imageViewerVisible"
+      :width="'90%'"
+      :show-close="true"
+      :close-on-click-modal="true"
+      :close-on-press-escape="true"
+      align-center
+      class="image-viewer-dialog"
+      @close="closeImageViewer"
+    >
+      <div class="image-viewer-container">
+        <img :src="imageViewerSrc" alt="预览图片" class="image-viewer-img" />
+      </div>
+    </el-dialog>
   </el-drawer>
 </template>
 
@@ -234,6 +490,26 @@ const handleSubSectionClick = (subSectionId: string) => {
   color: #2c3e50;
 }
 
+.help-content-text :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 12px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.help-content-text :deep(img.clickable-image) {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.help-content-text :deep(img.clickable-image:hover) {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0.9;
+}
+
 /* 菜单项样式优化 */
 :deep(.el-menu-item) {
   color: #64748b;
@@ -278,6 +554,37 @@ const handleSubSectionClick = (subSectionId: string) => {
   .help-content {
     height: calc(100% - 200px);
   }
+}
+
+/* 全屏图片查看器样式 */
+:deep(.image-viewer-dialog) {
+  .el-dialog__body {
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh;
+    background-color: rgba(0, 0, 0, 0.9);
+  }
+}
+
+.image-viewer-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.image-viewer-img {
+  max-width: 100%;
+  max-height: 90vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 </style>
 

@@ -516,10 +516,10 @@ watch(
     <el-button @click="getConfigFlowList">
         重置修改
     </el-button>
-    <el-button>
+    <el-button disabled>
         保存为预设
     </el-button>
-    <el-button>
+    <el-button disabled>
         从预设加载
     </el-button>
 </div>

@@ -419,7 +419,7 @@ import { Eleme } from '@element-plus/icons-vue'
 
     </el-tab-pane>
 
-    <el-tab-pane label="小号角色设置(免绑定)">
+    <el-tab-pane label="小号角色设置(免绑定)" disabled>
       <div>
         <span>点击左侧窗口下的获取按钮可获取同主角色title的所有角色</span>
       </div>

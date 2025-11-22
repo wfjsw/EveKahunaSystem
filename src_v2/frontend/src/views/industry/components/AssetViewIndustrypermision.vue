@@ -147,9 +147,9 @@ onMounted(async () => {
                 <el-table-column label="资产类型" prop="owner_type" />
                 <el-table-column label="所有者" prop="owner_name" width="200"/>
                 <el-table-column label="容器ID" prop="asset_container_id" />
-                <el-table-column label="建筑" prop="structure_name" width="200"/>
+                <el-table-column label="建筑" prop="structure_name" width="250"/>
                 <el-table-column label="星系" prop="system_name" />
-                <el-table-column label="标签" prop="tag" />
+                <el-table-column label="标签" prop="tag" width="200"/>
                 <el-table-column label="操作" width="200">
                     <template #default="scope">
                         <el-button type="primary" @click="handleDeleteIndustrypermision(scope.row)">删除</el-button>
@@ -157,11 +157,6 @@ onMounted(async () => {
                     </template>
                 </el-table-column>
             </el-table>
-        </div>
-        <div>
-            <h1>
-                1
-            </h1>
         </div>
     </div>
 
