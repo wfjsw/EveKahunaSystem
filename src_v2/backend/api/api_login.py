@@ -128,11 +128,20 @@ async def get_current_user():
         if not user:
             return jsonify({"status": 404, "message": "用户不存在"}), 404
 
+        # 获取vip等级
+        roles = await user.roles
+        vip_state = await permission_manager.get_vip_state(user_id)
+        if vip_state:
+            logger.info(f"vip_state: {vip_state.vip_level}")
+            roles.append(vip_state.vip_level)
+        else:
+            logger.info(f"vip_state: None")
+
         return jsonify({
             "status": 200,
             "id": user.user_name,
             "username": user.user_name,
-            "roles": await user.roles,
+            "roles": list(set(roles)),
         })
     except KahunaException as e:
         return jsonify({"status": 500, "message": str(e)}), 500
