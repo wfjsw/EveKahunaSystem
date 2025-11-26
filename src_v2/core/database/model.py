@@ -11,7 +11,7 @@ from sqlalchemy import (
     BigInteger,
     UUID,
     ARRAY,
-    type_=TIMESTAMP(timezone=True),
+    TIMESTAMP,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
