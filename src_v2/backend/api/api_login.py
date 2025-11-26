@@ -240,6 +240,9 @@ async def oidc_callback():
                 except Exception as e:
                     logger.error(f"删除角色失败: {traceback.format_exc()}")
 
+        if 'ticker-member' in roles:
+            roles.append('user')
+
         _set_session_for_user(user_name, roles=roles)
 
         # redirect to frontend; session cookie holds auth state
