@@ -96,7 +96,11 @@ class Character():
         if not user_obj.refresh_token:
             raise KahunaException("用户 Refresh token 不可用，请重新授权")
 
-        if user_obj.token_expires_at and user_obj.token_expires_at > datetime.now(timezone.utc) + timedelta(minutes=5) and user_obj.access_token:
+        expires_at = user_obj.token_expires_at
+        if expires_at is not None and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+        if expires_at and expires_at > datetime.now(timezone.utc) + timedelta(minutes=5) and user_obj.access_token:
             return user_obj.access_token
 
         provider = os.getenv('OIDC_PROVIDER') or app.config.get('OIDC_PROVIDER') or 'https://seat.winterco.org'
@@ -209,14 +213,19 @@ class Character():
         if self.token_expires_date is None:
             return False
 
-        # 获取当前时间
+        # 获取当前时间（确保为timezone-aware）
         current = datetime.now(timezone.utc)
 
         # 添加5分钟缓冲
         now = current + timedelta(minutes=5)
 
-        logger.debug(f"check if {self.token_expires_date} > {now} = {self.token_expires_date > now}")
-        return self.token_expires_date > now
+        # 确保 token_expires_date 也是 timezone-aware
+        expires_date = self.token_expires_date
+        if expires_date.tzinfo is None:
+            expires_date = expires_date.replace(tzinfo=timezone.utc)
+
+        logger.debug(f"check if {expires_date} > {now} = {expires_date > now}")
+        return expires_date > now
 
     async def refresh_wallet_balance(self):
         wallet_balance = await eveesi.character_character_id_wallet(self.ac_token, self.character_id)
