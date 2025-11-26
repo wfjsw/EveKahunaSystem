@@ -156,6 +156,8 @@ export const useAuthStore = defineStore('auth', () => {
       lastAuthCheckAtMs.value = null
       lastAuthCheckResult.value = false
 
+      location.reload()
+
       return { success: true }
     } catch (err) {
       // 捕获错误，设置 error 信息，便于页面展示
