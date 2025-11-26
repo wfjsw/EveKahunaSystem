@@ -778,11 +778,11 @@ onMounted(() => {
       </el-form-item>
 
       <el-form-item label="是否考虑库存蓝图">
-        <el-switch v-model="current_plan_settings.considerate_bp_relation" :disabled="!haveAlphaRole" />
+        <el-switch v-model="current_plan_settings.considerate_bp_relation" />
       </el-form-item>
 
       <el-form-item label="蓝图拷贝完全使用">
-        <el-switch v-model="current_plan_settings.full_use_bp_cp" :disabled="!haveAlphaRole" />
+        <el-switch v-model="current_plan_settings.full_use_bp_cp" />
       </el-form-item>
 
       <el-form-item label="工作安排方式">

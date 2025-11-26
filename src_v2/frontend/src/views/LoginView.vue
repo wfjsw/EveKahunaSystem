@@ -7,8 +7,6 @@
       </div>
       <el-form
         ref="loginFormRef"
-        :model="loginForm"
-        :rules="loginRules"
         class="login-form"
       >
         <el-form-item>
