@@ -234,9 +234,9 @@ async def oidc_callback():
         existing_characters = await CharacterManager().get_user_all_characters(user_name)
         user_character_ids = {char['id'] for char in user_characters}
         for character in existing_characters:
-            if character['id'] not in user_character_ids:
+            if character.character_id not in user_character_ids:
                 try:
-                    await EveAuthedCharacterDBUtils.delete_character_by_character_id(character['id'])
+                    await EveAuthedCharacterDBUtils.delete_character_by_character_id(character.character_id)
                 except Exception as e:
                     logger.error(f"删除角色失败: {traceback.format_exc()}")
 

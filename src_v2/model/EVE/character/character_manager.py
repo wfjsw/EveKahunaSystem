@@ -118,9 +118,9 @@ class CharacterManager(metaclass=SingletonMeta):
 
         await EveAuthedCharacterDBUtils.merge(character_db_obj)
         character = Character.from_db_obj(character_db_obj)
-        character_roles = await eveesi.characters_character_roles(character.ac_token, character_id)
-        character_db_obj.director = "Director" in character_roles['roles'] if 'roles' in character_roles else None
-        await EveAuthedCharacterDBUtils.merge(character_db_obj)
+        # character_roles = await eveesi.characters_character_roles(character.ac_token, character_id)
+        # character_db_obj.director = "Director" in character_roles['roles'] if 'roles' in character_roles else None
+        # await EveAuthedCharacterDBUtils.merge(character_db_obj)
 
         return character
 
