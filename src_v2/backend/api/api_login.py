@@ -47,12 +47,12 @@ async def get_current_user():
         # read current user from session-provided g.current_user
         current = g.current_user
         # prefer user_name for display; many helpers still accept username
-        user_lookup = current.get('user_name') or current.get('user_id')
+        user_lookup = current.get('user_name')
         user = await UserManager().get_user(user_lookup)
         if not user:
             return jsonify({"status": 404, "message": "用户不存在"}), 404
 
-        roles = current.roles
+        roles = current.get('roles')
 
         # roles = await permission_manager.get_user_roles(user_lookup)
         # vip_state = await permission_manager.get_vip_state(user_lookup)
