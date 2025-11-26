@@ -7,7 +7,7 @@ from src_v2.backend.auth import auth_required
 from werkzeug.security import check_password_hash, generate_password_hash
 import os
 import aiohttp
-from jwt import PyJWKClient
+from jwt import PyJWKClient, PyJWKClientError
 
 from src_v2.core.config.config import config
 from src_v2.core.permission.permission_manager import permission_manager
@@ -165,7 +165,12 @@ async def oidc_callback():
             if not jwks_uri:
                 return jsonify({"status": 500, "message": "jwks_uri not provided by issuer configuration"}), 500
             jwks_client = PyJWKClient(jwks_uri)
-            signing_key = jwks_client.get_signing_key_from_jwt(id_token)
+            try:
+                signing_key = jwks_client.get_signing_key_from_jwt(id_token)
+            except PyJWKClientError:
+                key_set = jwks_client.get_jwk_set()
+                signing_key = key_set.keys[0]
+
             # audience and issuer validation
             decoded = jwt.decode(
                 id_token,

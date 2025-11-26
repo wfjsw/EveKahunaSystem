@@ -2,7 +2,7 @@ import os
 from typing import Any
 
 import aiohttp
-from jwt import PyJWKClient
+from jwt import PyJWKClient, PyJWKClientError
 import jwt
 from quart import current_app as app, jsonify
 from oauthlib.oauth2 import InvalidClientIdError, InvalidScopeError
@@ -142,7 +142,11 @@ class Character():
             if not jwks_uri:
                 return jsonify({"status": 500, "message": "jwks_uri not provided by issuer configuration"}), 500
             jwks_client = PyJWKClient(jwks_uri)
-            signing_key = jwks_client.get_signing_key_from_jwt(access_token)
+            try:
+                signing_key = jwks_client.get_signing_key_from_jwt(access_token)
+            except PyJWKClientError:
+                key_set = jwks_client.get_jwk_set()
+                signing_key = key_set.keys[0]
             # audience and issuer validation
             decoded = jwt.decode(
                 access_token,
@@ -153,7 +157,7 @@ class Character():
             )
         except Exception as ex:
             logger.error(f"access_token validation failed: {traceback.format_exc()}")
-            raise KahunaException("ID Token 验证失败，请重新授权")
+            raise KahunaException("Access Token 验证失败，请重新授权")
         
         token_refresh_token = token_json.get('refresh_token') or user_obj.refresh_token
         if token_refresh_token != user_obj.refresh_token:
