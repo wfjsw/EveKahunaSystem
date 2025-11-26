@@ -199,6 +199,10 @@ async def oidc_callback():
 
         roles = decoded.get('groups', [])
 
+        user_characters = decoded.get('acct', [])
+
+        main_character_id = next((char['id'] for char in user_characters), None)
+
         if user_obj:
             user_obj.access_token = access_token or id_token or None
             user_obj.refresh_token = token_json.get('refresh_token')
@@ -211,12 +215,12 @@ async def oidc_callback():
                 display_name=display_name,
                 access_token=(access_token or id_token),
                 refresh_token=token_json.get('refresh_token'),
-                token_expires_at=expires_at
+                token_expires_at=expires_at,
+                main_character_id=main_character_id,
             )
             # assign default role
             # await permission_manager.add_role_to_user(user_name, 'user')
 
-        user_characters = decoded.get('acct', [])
 
         for char in user_characters:
             try:

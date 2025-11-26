@@ -39,7 +39,7 @@ class UserManager(metaclass=SingletonMeta):
         self.init_status = False
         self.lock = Lock()
 
-    async def create_user(self, user_name: AnyStr, display_name: AnyStr, access_token: str | None = None, refresh_token: str | None = None, token_expires_at: datetime | None = None) -> User:
+    async def create_user(self, user_name: AnyStr, display_name: AnyStr, access_token: str | None = None, refresh_token: str | None = None, token_expires_at: datetime | None = None, main_character_id: int | None = None) -> User:
         # 检查是否已存在
         if await UserDBUtils.select_user_by_user_name(user_name):
             raise KahunaException("用户已存在")
@@ -58,7 +58,8 @@ class UserManager(metaclass=SingletonMeta):
             await UserDBUtils.save_obj(user_database_obj, session=session)
             #  创建userdata
             userdata_database_obj = M_UserData(
-                user_name=user_name
+                user_name=user_name,
+                main_character_id=main_character_id,
             )
             await UserDataDBUtils.save_obj(userdata_database_obj, session=session)
 
