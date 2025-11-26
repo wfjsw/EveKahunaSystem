@@ -1070,7 +1070,7 @@ class SDEImporter:
                 logger.info("开始清理旧数据")
                 
                 # 尝试禁用外键约束
-                fk_disabled = await self.disable_foreign_keys(conn)
+                # fk_disabled = await self.disable_foreign_keys(conn)
                 
                 # 清空所有表（除了 _sde，它会在最后处理）
                 tables_to_clear = []
@@ -1131,8 +1131,8 @@ class SDEImporter:
                 logger.info("验证数据完整性")
                 
                 # 重新启用外键约束
-                if fk_disabled:
-                    await self.enable_foreign_keys(conn)
+                # if fk_disabled:
+                #     await self.enable_foreign_keys(conn)
                 
                 # 验证关键表是否有数据
                 result = await conn.execute(text('SELECT COUNT(*) FROM "_sde"'))
