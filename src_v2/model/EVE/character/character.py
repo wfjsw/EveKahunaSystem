@@ -59,7 +59,9 @@ class Character():
         if refresh_res_dict:
             token_state.access_token = refresh_res_dict['access_token']
             # token_state.refresh_token = refresh_res_dict['refresh_token']
-            token_state.expires_time = datetime.fromtimestamp(refresh_res_dict["expires_at"]).astimezone(timezone.utc)
+            expires_in = refresh_res_dict["expires_in"]
+            # token_state.expires_time = datetime.fromtimestamp(refresh_res_dict["expires_at"]).astimezone(timezone.utc)
+            token_state.expires_time = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
             
             character_roles = await eveesi.characters_character_roles(token_state.access_token, self.character_id)
             director_status = "Director" in character_roles['roles'] if 'roles' in character_roles else None
