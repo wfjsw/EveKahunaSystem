@@ -61,7 +61,7 @@ const router = createRouter({
           path: 'assetView',
           name: 'assetView',
           component: () => import('../views/industry/assetView.vue'),
-          meta: { requiresAuth: true, roles: ['vip_alpha'] },
+          // meta: { requiresAuth: true, roles: ['vip_alpha'] },
         },
         {
           path: 'industryPlan',
