@@ -30,6 +30,7 @@ def auth_required(f):
         # expose a consistent current_user dict on `g`
         g.current_user = {
             'user_name': user_name,
+            'user_id': user_name,
             'roles': roles or []
         }
         return await f(*args, **kwargs)
