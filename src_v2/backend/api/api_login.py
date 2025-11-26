@@ -1,6 +1,7 @@
 import jwt
 import traceback
 
+import urllib.parse
 from quart import Quart, request, jsonify, g, Blueprint, current_app as app, redirect, session, Response
 from src_v2.backend.auth import auth_required
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -8,6 +9,7 @@ import os
 import aiohttp
 from jwt import PyJWKClient
 
+from src_v2.core.config.config import config
 from src_v2.core.permission.permission_manager import permission_manager
 from src_v2.core.user.user_manager import UserManager
 from src_v2.core.log import logger
@@ -93,9 +95,21 @@ async def oidc_login():
     nonce = os.urandom(8).hex()
     session['oidc_state'] = state
     session['oidc_nonce'] = nonce
+
+    esi_scope=[k for k, v in dict(config['ESI']).items() if v == 'true']
+
+    scopes = ['openid', 'accounts', 'groups', 'passthrough']
+    scopes.extend(esi_scope)
+
+    client_id = urllib.parse.quote(str(client_id), safe='')
+    redirect_uri = urllib.parse.quote(redirect_uri, safe='')
+    state = urllib.parse.quote(state, safe='')
+    nonce = urllib.parse.quote(nonce, safe='')
+    scope = urllib.parse.quote(' '.join(scopes), safe='')
+
     authorize_url = (
         f"{authorization_endpoint}?response_type=code&client_id={client_id}"
-        f"&redirect_uri={redirect_uri}&scope=openid&state={state}&nonce={nonce}"
+        f"&redirect_uri={redirect_uri}&scope={scope}&state={state}&nonce={nonce}"
     )
     return redirect(authorize_url)
 
