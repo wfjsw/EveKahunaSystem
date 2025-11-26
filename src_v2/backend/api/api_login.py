@@ -52,10 +52,12 @@ async def get_current_user():
         if not user:
             return jsonify({"status": 404, "message": "用户不存在"}), 404
 
-        roles = await permission_manager.get_user_roles(user_lookup)
-        vip_state = await permission_manager.get_vip_state(user_lookup)
-        if vip_state:
-            roles.append(vip_state.vip_level)
+        roles = current.roles
+
+        # roles = await permission_manager.get_user_roles(user_lookup)
+        # vip_state = await permission_manager.get_vip_state(user_lookup)
+        # if vip_state:
+        #     roles.append(vip_state.vip_level)
 
         return jsonify({
             "status": 200,
@@ -194,8 +196,8 @@ async def oidc_callback():
         # Create or update local user: store access_token, refresh_token, expires_at
         user_obj = await UserDBUtils.select_user_by_user_name(user_name)
         expires_at = datetime.fromtimestamp(decoded.get('exp'), tz=timezone.utc)
-        roles = decoded.get('groups', [])
 
+        roles = decoded.get('groups', [])
 
         if user_obj:
             user_obj.access_token = access_token or id_token or None
