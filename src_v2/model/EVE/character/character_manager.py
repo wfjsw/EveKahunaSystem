@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import re
 from symtable import Class
-from warnings import deprecated
+# from warnings import deprecated
 from typing import Dict, AnyStr, List
 import os
 import asyncio
