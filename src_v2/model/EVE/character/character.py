@@ -83,7 +83,7 @@ class Character():
         }
 
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10.0)) as client:
-            async with client.get(passthrough_url, headers=headers) as resp:
+            async with client.post(passthrough_url, headers=headers) as resp:
                 if resp.status != 200:
                     logger.error(f"Passthrough token fetch failed: status={resp.status} body={await resp.text()}")
                     raise KahunaException("Passthrough token 获取失败，请重新授权")
