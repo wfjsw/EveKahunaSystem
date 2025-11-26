@@ -78,15 +78,15 @@ class UserManager(metaclass=SingletonMeta):
         return user_data
 
     async def get_main_character_id(self, user_name: AnyStr):
-        main_character_id = await redis_manager.redis.get(f"user_{user_name}:main_character_id")
-        if main_character_id:
-            return int(main_character_id)
+        # main_character_id = await redis_manager.redis.get(f"user_{user_name}:main_character_id")
+        # if main_character_id:
+        #     return int(main_character_id)
         user_data = await UserDataDBUtils.select_user_data_by_user_name(user_name)
         if not user_data:
             raise KahunaException("用户数据不存在")
         if not user_data.main_character_id:
             raise KahunaException("用户主角色未设置")
-        await redis_manager.redis.set(f"user_{user_name}:main_character_id", user_data.main_character_id, ex=60 * 60)
+        # await redis_manager.redis.set(f"user_{user_name}:main_character_id", user_data.main_character_id, ex=60 * 60)
         return user_data.main_character_id
 
     async def set_main_character(self, user_name: str, main_character_name: str):
