@@ -13,6 +13,8 @@ from neo4j.exceptions import TransactionError
 
 from redis.asyncio import Redis
 
+from urllib.parse import quote_plus
+
 from ..config.config import config
 from ..log import logger
 
@@ -828,8 +830,12 @@ class PostgreDatabaseManager():
 
     async def create_async_session(self, host: str, port: int, database: str, user: str, password: str):
         """创建异步数据库会话"""
+        user_enc = quote_plus(user)
+        password_enc = quote_plus(password)
+        database_enc = quote_plus(database)
+
         # 构建 PostgreSQL 异步连接 URL
-        database_url = f'postgresql+asyncpg://{user}:{password}@{host}:{port}/{database}'
+        database_url = f'postgresql+asyncpg://{user_enc}:{password_enc}@{host}:{port}/{database_enc}'
 
         # 创建异步引擎
         self.engine = create_async_engine(

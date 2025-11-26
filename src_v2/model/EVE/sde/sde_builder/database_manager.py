@@ -15,6 +15,7 @@ from sqlalchemy import text
 from src_v2.core.config.config import config
 from src_v2.core.log import logger
 from src_v2.core.database.connect_manager import PostgreDatabaseManager
+from urllib.parse import quote_plus
 
 # 创建独立的 SDE 模型基类
 SDEModel = declarative_base()
@@ -32,8 +33,14 @@ class SDEDatabaseManager:
     
     async def create_async_session(self, host: str, port: int, database: str, user: str, password: str):
         """创建异步数据库会话"""
+
+
+        user_enc = quote_plus(user)
+        password_enc = quote_plus(password)
+        database_enc = quote_plus(database)
+
         # 构建 PostgreSQL 异步连接 URL
-        database_url = f'postgresql+asyncpg://{user}:{password}@{host}:{port}/{database}'
+        database_url = f'postgresql+asyncpg://{user_enc}:{password_enc}@{host}:{port}/{database_enc}'
         
         # 创建异步引擎
         self.engine = create_async_engine(
@@ -72,8 +79,12 @@ class SDEDatabaseManager:
             是否成功
         """
         try:
+            user_enc = quote_plus(user)
+            password_enc = quote_plus(password)
+            database_enc = quote_plus(database)
+
             # 先尝试连接到目标数据库
-            test_url = f'postgresql+asyncpg://{user}:{password}@{host}:{port}/{database}'
+            test_url = f'postgresql+asyncpg://{user_enc}:{password_enc}@{host}:{port}/{database_enc}'
             test_engine = create_async_engine(test_url, pool_pre_ping=True)
             async with test_engine.connect() as conn:
                 # 连接成功，数据库已存在
@@ -96,7 +107,12 @@ class SDEDatabaseManager:
             
             try:
                 # 连接到 postgres 系统数据库来创建新数据库
-                postgres_url = f'postgresql+asyncpg://{user}:{password}@{host}:{port}/postgres'
+
+                user_enc = quote_plus(user)
+                password_enc = quote_plus(password)
+                database_enc = quote_plus(database)
+
+                postgres_url = f'postgresql+asyncpg://{user_enc}:{password_enc}@{host}:{port}/postgres'
                 postgres_engine = create_async_engine(postgres_url, pool_pre_ping=True)
                 
                 async with postgres_engine.begin() as conn:
