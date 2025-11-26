@@ -206,6 +206,9 @@ class Character():
 
     @property
     def token_avaliable(self):
+        if self.token_expires_date is None:
+            return False
+
         # 获取当前时间
         current = datetime.now(timezone.utc)
 
