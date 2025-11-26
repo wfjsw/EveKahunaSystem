@@ -220,7 +220,7 @@ async def oidc_callback():
             try:
                 # 使用从state解析出的user_id，而不是g.current_user
                 character = await CharacterManager().insert_new_character(
-                    char.id,
+                    char['id'],
                     user_name  # 使用从state解析出的user_id
                 )
             except KahunaException as e:
@@ -232,11 +232,11 @@ async def oidc_callback():
 
         # 删除不在 user_characters 列表中的角色
         existing_characters = await CharacterManager().get_user_all_characters(user_name)
-        user_character_ids = {char.id for char in user_characters}
+        user_character_ids = {char['id'] for char in user_characters}
         for character in existing_characters:
-            if character.id not in user_character_ids:
+            if character['id'] not in user_character_ids:
                 try:
-                    await EveAuthedCharacterDBUtils.delete_character_by_character_id(character.id)
+                    await EveAuthedCharacterDBUtils.delete_character_by_character_id(character['id'])
                 except Exception as e:
                     logger.error(f"删除角色失败: {traceback.format_exc()}")
 
