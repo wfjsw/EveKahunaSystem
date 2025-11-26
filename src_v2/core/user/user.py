@@ -1,7 +1,7 @@
 from typing import AnyStr, List
 from datetime import datetime, timedelta
 import json
-from warnings import deprecated
+# from warnings import deprecated
 
 from src_v2.core.database.kahuna_database_utils_v2 import (
     UserDataDBUtils,
