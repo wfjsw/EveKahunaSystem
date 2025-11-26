@@ -29,3 +29,4 @@ dist/
 build/
 *.log
 config.toml
+venv/

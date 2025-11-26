@@ -3,10 +3,26 @@
     <div class="login-card">
       <div class="login-header">
         <h2>登录 Kahuna-System</h2>
-        <p>请输入您的账号信息</p>
+        <!-- <p>请输入您的账号信息</p> -->
       </div>
-
       <el-form
+        ref="loginFormRef"
+        :model="loginForm"
+        :rules="loginRules"
+        class="login-form"
+      >
+        <el-form-item>
+          <el-button
+            type="primary"
+            size="large"
+            class="login-button"
+            @click="handleLogin"
+          >
+            使用 WinterCo. SeAT 登录
+          </el-button>
+        </el-form-item>
+      </el-form>
+      <!-- <el-form
         ref="loginFormRef"
         :model="loginForm"
         :rules="loginRules"
@@ -45,9 +61,9 @@
             使用 Winterco 登录
           </el-button>
         </el-form-item>
-      </el-form>
+      </el-form> -->
 
-      <div class="register-link">
+      <!-- <div class="register-link">
         <el-button
           type="text"
           size="default"
@@ -55,15 +71,15 @@
         >
           还没有账号？立即注册
         </el-button>
-      </div>
+      </div> -->
 
-      <div v-if="authStore.error" class="error-message">
+      <!-- <div v-if="authStore.error" class="error-message">
         {{ authStore.error }}
-      </div>
+      </div> -->
     </div>
 
     <!-- 注册对话框 -->
-    <el-dialog
+    <!-- <el-dialog
       v-model="showRegisterDialog"
       title="注册账号"
       width="400px"
@@ -118,7 +134,7 @@
           </el-button>
         </div>
       </template>
-    </el-dialog>
+    </el-dialog> -->
   </div>
 </template>
 
@@ -131,131 +147,131 @@ import { useAuthStore } from '@/stores/auth'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const loginFormRef = ref<FormInstance>()
-const registerFormRef = ref<FormInstance>()
-const passwordInputRef = ref<HTMLElement>()
+// const loginFormRef = ref<FormInstance>()
+// const registerFormRef = ref<FormInstance>()
+// const passwordInputRef = ref<HTMLElement>()
 
-const showRegisterDialog = ref(false)
-const isRegistering = ref(false)
+// const showRegisterDialog = ref(false)
+// const isRegistering = ref(false)
 
-const loginForm = reactive({
-  username: '',
-  password: ''
-})
+// const loginForm = reactive({
+//   username: '',
+//   password: ''
+// })
 
-const registerForm = reactive({
-  username: '',
-  password: '',
-  confirmPassword: '',
+// const registerForm = reactive({
+//   username: '',
+//   password: '',
+//   confirmPassword: '',
 
-})
+// })
 
-// 验证用户名格式（只能包含字母和数字）
-const validateUsername = (rule: any, value: string, callback: any) => {
-  if (!value) {
-    callback(new Error('请输入用户名'))
-  } else if (!/^[a-zA-Z0-9]+$/.test(value)) {
-    callback(new Error('用户名只能包含大小写字母和数字'))
-  } else {
-    callback()
-  }
-}
+// // 验证用户名格式（只能包含字母和数字）
+// const validateUsername = (rule: any, value: string, callback: any) => {
+//   if (!value) {
+//     callback(new Error('请输入用户名'))
+//   } else if (!/^[a-zA-Z0-9]+$/.test(value)) {
+//     callback(new Error('用户名只能包含大小写字母和数字'))
+//   } else {
+//     callback()
+//   }
+// }
 
-// 验证确认密码
-const validateConfirmPassword = (rule: any, value: string, callback: any) => {
-  if (!value) {
-    callback(new Error('请再次输入密码'))
-  } else if (value !== registerForm.password) {
-    callback(new Error('两次输入的密码不一致'))
-  } else {
-    callback()
-  }
-}
+// // 验证确认密码
+// const validateConfirmPassword = (rule: any, value: string, callback: any) => {
+//   if (!value) {
+//     callback(new Error('请再次输入密码'))
+//   } else if (value !== registerForm.password) {
+//     callback(new Error('两次输入的密码不一致'))
+//   } else {
+//     callback()
+//   }
+// }
 
-const loginRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' }
-  ]
-}
+// const loginRules = {
+//   username: [
+//     { required: true, message: '请输入用户名', trigger: 'blur' }
+//   ],
+//   password: [
+//     { required: true, message: '请输入密码', trigger: 'blur' }
+//   ]
+// }
 
-const registerRules: FormRules = {
-  username: [
-    { required: true, validator: validateUsername, trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度至少为6位', trigger: 'blur' }
-  ],
-  confirmPassword: [
-    { required: true, validator: validateConfirmPassword, trigger: 'blur' }
-  ],
+// const registerRules: FormRules = {
+//   username: [
+//     { required: true, validator: validateUsername, trigger: 'blur' }
+//   ],
+//   password: [
+//     { required: true, message: '请输入密码', trigger: 'blur' },
+//     { min: 6, message: '密码长度至少为6位', trigger: 'blur' }
+//   ],
+//   confirmPassword: [
+//     { required: true, validator: validateConfirmPassword, trigger: 'blur' }
+//   ],
 
-}
+// }
 
 // 用户名输入框回车时，聚焦到密码框
-const focusPassword = () => {
-  if (passwordInputRef.value) {
-    passwordInputRef.value.focus()
-  }
-}
+// const focusPassword = () => {
+//   if (passwordInputRef.value) {
+//     passwordInputRef.value.focus()
+//   }
+// }
 
 // 密码输入框回车时，执行登录
-const handleLogin = async () => {
+const handleLogin = () => {
   // Redirect to backend OIDC login start endpoint
   window.location.href = '/api/auth/oidc/login'
 }
 
-// 处理注册
-const handleRegister = async () => {
-  if (!registerFormRef.value) return
+// // 处理注册
+// const handleRegister = async () => {
+//   if (!registerFormRef.value) return
 
-  try {
-    await registerFormRef.value.validate()
-    isRegistering.value = true
+//   try {
+//     await registerFormRef.value.validate()
+//     isRegistering.value = true
 
-    const response = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username: registerForm.username,
-        password: registerForm.password
-      }),
-    })
+//     const response = await fetch('/api/auth/signup', {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify({
+//         username: registerForm.username,
+//         password: registerForm.password
+//       }),
+//     })
 
-    const data = await response.json()
+//     const data = await response.json()
 
-    if (data.status === 200) {
-      ElMessage.success(data.message || '注册成功，请登录')
-      showRegisterDialog.value = false
-      handleDialogClose()
-      // 自动填充用户名
-      loginForm.username = registerForm.username
-    } else {
-      ElMessage.error(data.message || '注册失败')
-    }
-  } catch (error) {
-    console.error('注册失败:', error)
-    ElMessage.error('注册失败，请稍后重试')
-  } finally {
-    isRegistering.value = false
-  }
-}
+//     if (data.status === 200) {
+//       ElMessage.success(data.message || '注册成功，请登录')
+//       showRegisterDialog.value = false
+//       handleDialogClose()
+//       // 自动填充用户名
+//       loginForm.username = registerForm.username
+//     } else {
+//       ElMessage.error(data.message || '注册失败')
+//     }
+//   } catch (error) {
+//     console.error('注册失败:', error)
+//     ElMessage.error('注册失败，请稍后重试')
+//   } finally {
+//     isRegistering.value = false
+//   }
+// }
 
-// 关闭对话框时重置表单
-const handleDialogClose = () => {
-  if (registerFormRef.value) {
-    registerFormRef.value.resetFields()
-  }
-  registerForm.username = ''
-  registerForm.password = ''
-  registerForm.confirmPassword = ''
+// // 关闭对话框时重置表单
+// const handleDialogClose = () => {
+//   if (registerFormRef.value) {
+//     registerFormRef.value.resetFields()
+//   }
+//   registerForm.username = ''
+//   registerForm.password = ''
+//   registerForm.confirmPassword = ''
 
-}
+// }
 
 onMounted(() => {
   // 如果已经登录，直接跳转
@@ -264,10 +280,10 @@ onMounted(() => {
   }
 
   // 自动聚焦到用户名输入框
-  const usernameInput = document.querySelector('input[placeholder="用户名"]') as HTMLInputElement
-  if (usernameInput) {
-    usernameInput.focus()
-  }
+  // const usernameInput = document.querySelector('input[placeholder="用户名"]') as HTMLInputElement
+  // if (usernameInput) {
+  //   usernameInput.focus()
+  // }
 })
 </script>
 

@@ -53,16 +53,16 @@ class HttpService {
     })
 
     // 请求拦截器：注入认证头
-    this.client.interceptors.request.use((config) => {
-      const authStore = useAuthStore()
-      if (authStore.token) {
-        config.headers = {
-          ...(config.headers as any),
-          Authorization: `Bearer ${authStore.token}`
-        }
-      }
-      return config
-    })
+    // this.client.interceptors.request.use((config) => {
+    //   const authStore = useAuthStore()
+    //   if (authStore.token) {
+    //     config.headers = {
+    //       ...(config.headers as any),
+    //       Authorization: `Bearer ${authStore.token}`
+    //     }
+    //   }
+    //   return config
+    // })
 
     // 响应拦截器：统一处理 401 / 403
     this.client.interceptors.response.use((response) => {

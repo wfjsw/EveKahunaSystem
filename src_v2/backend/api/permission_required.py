@@ -12,6 +12,18 @@ def permission_required(req_permissions: list[str]):
     def decorator(f):
         @wraps(f)
         async def decorated_function(*args, **kwargs):
+
+            user = getattr(g, "current_user", None)
+            if not user:
+                logger.error(f"{f.__name__}: 用户未登录，权限不足")
+                return jsonify({'error': '权限不足'}), 403
+            roles = user.get('roles', [])
+            for req_role in req_permissions:
+                if req_role not in roles:
+                    logger.error(f"{f.__name__}: 用户 {user.user_name} 权限不足，缺少权限 {req_permissions}")
+                    return jsonify({'error': '权限不足'}), 403
+
+            return True
             # 在请求执行时检查权限
             user_id = g.current_user['user_id']
             for permission in req_permissions:
@@ -51,35 +63,44 @@ def role_required(req_roles: list[str], res_code = 403, message: str = '权限�
     def decorator(f):
         @wraps(f)
         async def decorated_function(*args, **kwargs):
-            user_id = g.current_user['user_id']
-            # 获取用户直接拥有的角色
-            direct_roles = await permission_manager.get_user_roles(user_id)
-            
-            # 获取所有角色（直接角色 + 所有子角色）
-            all_roles = set(direct_roles)
-            for role in direct_roles:
-                # 递归获取该角色的所有子角色
-                descendant_roles = await permission_manager.get_all_descendant_roles(role)
-                all_roles.update(descendant_roles)
-            
-            # 获取vip等级
-            vip_state = await permission_manager.get_vip_state(user_id)
-            if vip_state:
-                logger.info(f"vip_state: {vip_state.vip_level}")
-                all_roles.add(vip_state.vip_level)
-            else:
-                logger.info(f"vip_state: None")
+            user = getattr(g, "current_user", None)
+            if not user:
+                return jsonify({'message': message}), res_code
+            roles = user.get('roles', [])
+            for req_role in req_roles:
+                if req_role not in roles:
+                    return jsonify({'message': message}), res_code
 
-            # 检查所需的角色是否在扩展后的角色集合中
-            role_access = all(role in all_roles for role in req_roles)
-            logger.info(f"all_roles: {all_roles}")
-            logger.info(f"req_roles: {req_roles}")
-            if not role_access:
-                if "vip_alpha" in req_roles or "vip_omega" in req_roles:
-                    return jsonify({'message': message}), res_code
-                else:
-                    logger.error(f"{f.__name__}: 用户 {user_id} 权限不足，缺少角色 {req_roles}")
-                    return jsonify({'message': message}), res_code
-            return await f(*args, **kwargs)
+
+            # user_id = g.current_user['user_id']
+            # # 获取用户直接拥有的角色
+            # direct_roles = await permission_manager.get_user_roles(user_id)
+            
+            # # 获取所有角色（直接角色 + 所有子角色）
+            # all_roles = set(direct_roles)
+            # for role in direct_roles:
+            #     # 递归获取该角色的所有子角色
+            #     descendant_roles = await permission_manager.get_all_descendant_roles(role)
+            #     all_roles.update(descendant_roles)
+            
+            # # 获取vip等级
+            # vip_state = await permission_manager.get_vip_state(user_id)
+            # if vip_state:
+            #     logger.info(f"vip_state: {vip_state.vip_level}")
+            #     all_roles.add(vip_state.vip_level)
+            # else:
+            #     logger.info(f"vip_state: None")
+
+            # # 检查所需的角色是否在扩展后的角色集合中
+            # role_access = all(role in all_roles for role in req_roles)
+            # logger.info(f"all_roles: {all_roles}")
+            # logger.info(f"req_roles: {req_roles}")
+            # if not role_access:
+            #     if "vip_alpha" in req_roles or "vip_omega" in req_roles:
+            #         return jsonify({'message': message}), res_code
+            #     else:
+            #         logger.error(f"{f.__name__}: 用户 {user_id} 权限不足，缺少角色 {req_roles}")
+            #         return jsonify({'message': message}), res_code
+            # return await f(*args, **kwargs)
         return decorated_function
     return decorator

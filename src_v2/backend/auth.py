@@ -1,8 +1,9 @@
 import datetime
 import jwt
 from functools import wraps
-from quart import request, jsonify, g
+from quart import request, jsonify, g, session
 from quart import current_app as app
+from src_v2.core.permission.permission_manager import permission_manager
 
 def verify_token(token: str):
     """验证JWT token"""
@@ -20,18 +21,17 @@ def auth_required(f):
 
     @wraps(f)
     async def decorated_function(*args, **kwargs):
-        token = request.headers.get('Authorization')
+        # Use server-side session for authentication
+        user_name = session.get('user_name')
+        if not user_name:
+            return jsonify({'error': '未登录'}), 401
+        roles = session.get('roles', [])
 
-        if not token or not token.startswith('Bearer '):
-            return jsonify({'error': '缺少认证token'}), 401
-
-        token = token.split(' ')[1]
-        payload = verify_token(token)
-
-        if not payload:
-            return jsonify({'error': '无效的token'}), 401
-
-        g.current_user = payload
+        # expose a consistent current_user dict on `g`
+        g.current_user = {
+            'user_name': user_name,
+            'roles': roles or []
+        }
         return await f(*args, **kwargs)
 
     return decorated_function

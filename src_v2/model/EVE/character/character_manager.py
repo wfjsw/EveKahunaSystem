@@ -72,40 +72,50 @@ class CharacterManager(metaclass=SingletonMeta):
 
         return corp_onj
 
-    async def insert_new_character(self, token_data: Dict, user_name: AnyStr) -> Character:
-        ac_token = token_data["ac_token"]
-        refresh_token = token_data["refresh_token"]
-        expires_at = token_data["expires_at"]
+    # async def insert_new_character(self, token_data: Dict, user_name: AnyStr) -> Character:
+        # ac_token = token_data["ac_token"]
+        # refresh_token = token_data["refresh_token"]
+        # expires_at = token_data["expires_at"]
 
-        character_verify_data = await eveesi.verify_token(ac_token)
-        if not character_verify_data or 'CharacterID' not in character_verify_data:
-            logger.error('No character info found')
-            logger.error(character_verify_data)
-            raise KahunaException('角色认证信息异常')
+        # character_verify_data = await eveesi.verify_token(ac_token)
+        # if not character_verify_data or 'CharacterID' not in character_verify_data:
+        #     logger.error('No character info found')
+        #     logger.error(character_verify_data)
+        #     raise KahunaException('角色认证信息异常')
 
-        character_id = character_verify_data['CharacterID']
+        # character_id = character_verify_data['CharacterID']
+        # character_data = await eveesi.characters_character(character_id)
+        # corp_id = character_data['corporation_id']
+        # character_name = character_verify_data['CharacterName']
+        # birthday = parse_iso_datetime(character_data['birthday']).astimezone(timezone.utc)
+        # corporation_id = character_data['corporation_id']
+        # expires_time = parse_iso_datetime(character_verify_data["ExpiresOn"]).astimezone(timezone.utc)
+        
+    async def insert_new_character(self, character_id: str, user_name: AnyStr) -> Character:
+
+        # character_db_obj = await EveAuthedCharacterDBUtils.select_character_by_character_id(character_id)
+        # if character_db_obj:
+        #     await EveAuthedCharacterDBUtils.delete_character_by_character_id(character_id)
+        #     # raise KahunaException('角色已被其他用户绑定，共享账号是不对的！')
+
         character_data = await eveesi.characters_character(character_id)
         corp_id = character_data['corporation_id']
-        character_name = character_verify_data['CharacterName']
+        character_name = character_data['name']
         birthday = parse_iso_datetime(character_data['birthday']).astimezone(timezone.utc)
         corporation_id = character_data['corporation_id']
-        expires_time = parse_iso_datetime(character_verify_data["ExpiresOn"]).astimezone(timezone.utc)
-
-        character_db_obj = await EveAuthedCharacterDBUtils.select_character_by_character_id(character_id)
-        if character_db_obj:
-            raise KahunaException('角色已被其他用户绑定，共享账号是不对的！')
 
         character_db_obj = M_EveAuthedCharacter(
             character_id=character_id,
             owner_user_name=user_name,
             character_name=character_name,
             birthday=birthday,
-            access_token=ac_token,
-            refresh_token=refresh_token,
-            expires_time=expires_time,
+            access_token=None,
+            # refresh_token=refresh_token,
+            expires_time=None,
             corporation_id=corporation_id
             # director="Director" in character_roles['roles'] if 'roles' in character_roles else None,
         )
+
         await EveAuthedCharacterDBUtils.merge(character_db_obj)
         character = Character.from_db_obj(character_db_obj)
         character_roles = await eveesi.characters_character_roles(character.ac_token, character_id)

@@ -40,19 +40,19 @@ async def get_character_list():
         logger.error(f"获取角色列表失败: {traceback.format_exc()}")
         return jsonify({"status": 500, "message": "获取角色列表失败"}), 500
 
-@api_user_bp.route("/deleteCharacter", methods=["POST"])
-@auth_required
-async def delete_character():
-    try:
-        data = await request.get_json()
-        character_name = data.get("characterName")
-        await CharacterManager().delete_character_by_character_name(character_name, g.current_user["user_id"])
-        return jsonify({"status": 200, "message": "角色删除成功"})
-    except KahunaException as e:
-        return jsonify({"status": 500, "message": str(e)}), 500
-    except Exception as e:
-        logger.error(f"删除角色失败: {traceback.format_exc()}")
-        return jsonify({"status": 500, "message": "删除角色失败"}), 500
+# @api_user_bp.route("/deleteCharacter", methods=["POST"])
+# @auth_required
+# async def delete_character():
+#     try:
+#         data = await request.get_json()
+#         character_name = data.get("characterName")
+#         await CharacterManager().delete_character_by_character_name(character_name, g.current_user["user_id"])
+#         return jsonify({"status": 200, "message": "角色删除成功"})
+#     except KahunaException as e:
+#         return jsonify({"status": 500, "message": str(e)}), 500
+#     except Exception as e:
+#         logger.error(f"删除角色失败: {traceback.format_exc()}")
+#         return jsonify({"status": 500, "message": "删除角色失败"}), 500
 
 @api_user_bp.route("/getMainCharacter", methods=["GET"])
 @auth_required

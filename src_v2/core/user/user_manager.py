@@ -39,7 +39,7 @@ class UserManager(metaclass=SingletonMeta):
         self.init_status = False
         self.lock = Lock()
 
-    async def create_user(self, user_name: AnyStr, access_token: str | None = None, refresh_token: str | None = None, token_expires_at: AnyStr | None = None) -> User:
+    async def create_user(self, user_name: AnyStr, display_name: AnyStr, access_token: str | None = None, refresh_token: str | None = None, token_expires_at: datetime | None = None) -> User:
         # 检查是否已存在
         if await UserDBUtils.select_user_by_user_name(user_name):
             raise KahunaException("用户已存在")
@@ -49,6 +49,7 @@ class UserManager(metaclass=SingletonMeta):
         async with postgres_manager.get_session() as session:
             user_database_obj = M_User(
                 user_name=user_name,
+                display_name=display_name,
                 create_date=datetime.now(timezone.utc),
                 access_token=access_token,
                 refresh_token=refresh_token,

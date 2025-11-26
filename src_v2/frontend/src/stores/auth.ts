@@ -17,30 +17,30 @@ export interface LoginCredentials {
 
 /**
  * defineStore 是 Pinia（Vue 官方推荐的状态管理库）中用于定义一个“store”的方法。
- * 
+ *
  * 它的作用类似于 Vuex 的 createStore，但语法更简洁、类型推断更好，且支持组合式 API。
- * 
+ *
  * 你可以把 defineStore 理解为“定义全局状态模块”的工厂函数。
- * 
+ *
  * 用法示例：
- * 
+ *
  * export const useAuthStore = defineStore('auth', () => {
  *   // 这里写 state、getter、action
  *   // ...
  *   return { ... }
  * })
- * 
+ *
  * 这样定义后，在组件或其他地方通过 useAuthStore() 就能访问和操作这个 store 里的状态和方法。
- * 
+ *
  * 详细文档见：https://pinia.vuejs.org/
  */
 /**
  * 这是一个 Pinia Store，用于管理用户认证相关的全局状态。
  * Pinia 是 Vue 官方推荐的状态管理库，类似于 Vuex，但更轻量、类型推断更好。
- * 
+ *
  * 你可以把 Store 理解为一个全局的“数据仓库”，
  * 里面可以存放状态（state）、计算属性（getter）、方法（action）。
- * 
+ *
  * 这里我们用 defineStore 定义了一个名为 'auth' 的 Store，专门处理登录、登出、用户信息等认证逻辑。
  */
 export const useAuthStore = defineStore('auth', () => {
@@ -57,7 +57,7 @@ export const useAuthStore = defineStore('auth', () => {
    * 即使刷新页面或关闭浏览器，数据也不会丢失，除非主动清除。
    * 这里我们尝试从 localStorage 读取 token，实现“自动登录”或“记住登录状态”的效果。
    */
-  const token = ref<string | null>(localStorage.getItem('auth_token'))
+  // const token = ref<string | null>(localStorage.getItem('auth_token'))
 
   /**
    * isLoading: 标记当前是否正在进行登录等异步操作，用于页面上显示加载动画。
@@ -80,7 +80,7 @@ export const useAuthStore = defineStore('auth', () => {
    * 只有 token 和 user 都存在时才算登录成功。
    * computed 是 Vue 的计算属性，依赖的值变化时会自动重新计算。
    */
-  const isAuthenticated = computed(() => !!token.value && !!user.value)
+  const isAuthenticated = computed(() => !!user.value)
 
   /**
    * userRole: 当前用户的角色（如 'admin'、'user'），未登录时为 'guest'。
@@ -94,31 +94,67 @@ export const useAuthStore = defineStore('auth', () => {
    * 登录成功后保存 token 和用户信息到状态和 localStorage。
    * 登录失败时设置 error 信息。
    */
-  const login = async (credentials: LoginCredentials) => {
-    isLoading.value = true      // 开始加载动画
-    error.value = null          // 清空之前的错误
+  // const login = async (credentials: LoginCredentials) => {
+  //   isLoading.value = true      // 开始加载动画
+  //   error.value = null          // 清空之前的错误
 
+  //   try {
+  //     // 向后端发送登录请求（统一HTTP封装，内置401/403处理）
+  //     const response = await http.post('/auth/login', credentials)
+
+  //     // 解析后端返回的数据（应包含 status、token 和 user 信息）
+  //     const data = await response.json()
+
+  //     // 检查 status 是否为 200
+  //     if (data.status !== 200) {
+  //       error.value = data.message || '登录失败'
+  //       return { success: false, error: error.value }
+  //     }
+
+  //     // 保存 token 和用户信息到状态和 localStorage
+  //     token.value = data.token
+  //     user.value = data.user
+  //     localStorage.setItem('auth_token', data.token)
+
+  //     // 设置认证缓存，避免登录后立即跳转时再次验证
+  //     lastAuthCheckAtMs.value = Date.now()
+  //     lastAuthCheckResult.value = true
+
+  //     return { success: true }
+  //   } catch (err) {
+  //     // 捕获错误，设置 error 信息，便于页面展示
+  //     error.value = err instanceof Error ? err.message : '登录失败'
+  //     return { success: false, error: error.value }
+  //   } finally {
+  //     isLoading.value = false   // 无论成功失败都结束加载动画
+  //   }
+  // }
+
+  /**
+   * logout: 登出方法，清空用户信息和 token，并从 localStorage 移除 token。
+   * 页面会自动变为未登录状态。
+   */
+  const logout = async () => {
     try {
       // 向后端发送登录请求（统一HTTP封装，内置401/403处理）
-      const response = await http.post('/auth/login', credentials)
+      const response = await http.post('/auth/logout')
 
       // 解析后端返回的数据（应包含 status、token 和 user 信息）
       const data = await response.json()
 
       // 检查 status 是否为 200
       if (data.status !== 200) {
-        error.value = data.message || '登录失败'
+        error.value = data.message || '登出失败'
         return { success: false, error: error.value }
       }
 
-      // 保存 token 和用户信息到状态和 localStorage
-      token.value = data.token
-      user.value = data.user
-      localStorage.setItem('auth_token', data.token)
-      
-      // 设置认证缓存，避免登录后立即跳转时再次验证
-      lastAuthCheckAtMs.value = Date.now()
-      lastAuthCheckResult.value = true
+      // 清空 token 和用户信息
+      // token.value = null
+      user.value = null
+      localStorage.removeItem('auth_token')
+
+      lastAuthCheckAtMs.value = null
+      lastAuthCheckResult.value = false
 
       return { success: true }
     } catch (err) {
@@ -131,27 +167,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * logout: 登出方法，清空用户信息和 token，并从 localStorage 移除 token。
-   * 页面会自动变为未登录状态。
-   */
-  const logout = () => {
-    user.value = null
-    token.value = null
-    localStorage.removeItem('auth_token')
-    // 清除缓存
-    lastAuthCheckAtMs.value = null
-    lastAuthCheckResult.value = false
-  }
-
-  /**
    * checkAuth: 检查当前 token 是否有效（比如页面刷新后）。
    * 会向后端请求当前用户信息，如果 token 无效则自动登出。
    * 通常在路由守卫或页面初始化时调用。
    */
   const checkAuth = async () => {
-    // 没有 token 直接返回未认证
-    if (!token.value) return false
-
     // 短时缓存命中：5分钟内直接返回上次校验结果（需要已有 user）
     if (
       lastAuthCheckAtMs.value &&
@@ -210,7 +230,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     // 状态
     user,
-    token,
+    // token,
     isLoading,
     error,
 
@@ -219,7 +239,7 @@ export const useAuthStore = defineStore('auth', () => {
     userRoles,
 
     // 方法
-    login,
+    // login,
     logout,
     checkAuth,
     clearError

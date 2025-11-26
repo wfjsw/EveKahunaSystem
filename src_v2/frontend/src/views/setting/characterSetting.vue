@@ -24,14 +24,14 @@ const startAuthStatusPolling = () => {
 
   console.log('开始轮询认证状态')
   listenersMounted = true
-  
+
   let pollCount = 0
   const checkAuthStatus = async () => {
     pollCount++
     if (pollCount % 5 === 0) {
       console.log(`认证状态轮询中... (第 ${pollCount} 次检查)`)
     }
-    
+
     try {
       const response = await http.get('/EVE/oauth/authStatus')
       if (response.ok) {
@@ -40,7 +40,7 @@ const startAuthStatusPolling = () => {
         if (data?.status === 200) {
           const authStatus = data?.authStatus
           const characterName = data?.characterName
-          
+
           if (authStatus === 'success') {
             console.log('检测到认证成功')
             handleAuthComplete(characterName)
@@ -52,11 +52,11 @@ const startAuthStatusPolling = () => {
       console.warn('检查认证状态失败:', error)
     }
   }
-  
+
   // 每 2 秒检查一次，持续 5 分钟（与后端 Redis 过期时间一致）
   pollInterval = setInterval(checkAuthStatus, 2000)
   console.log('✅ 开始轮询认证状态 (每 2 秒检查一次)')
-  
+
   // 5 分钟后停止轮询
   setTimeout(() => {
     if (pollInterval) {
@@ -81,7 +81,7 @@ const stopAuthStatusPolling = () => {
 const wrapEsiAuth = async () => {
   // 在打开认证窗口之前先开始轮询
   startAuthStatusPolling()
-  
+
   try {
     const response = await http.get('/EVE/oauth/authorize')
     const data = await handleApiResponse(response, '获取认证链接失败')
@@ -126,10 +126,10 @@ const getCharacterList = async () => {
 // 处理认证完成的函数
 const handleAuthComplete = (characterName: string) => {
   console.log('认证完成')
-  
+
   // 停止轮询
   stopAuthStatusPolling()
-  
+
   // 更新 UI
   addCharacterConfirm.value = false
   ElMessage.success(`绑定完成，角色名称: ${characterName}`)
@@ -285,7 +285,7 @@ const searchCharacters = async () => {
     ElMessage.warning('请输入搜索值')
     return
   }
-  
+
   searchLoading.value = true
   try {
     const response = await http.post('/user/searchCharacter', {
@@ -316,7 +316,7 @@ const addSelectedCharacters = async () => {
     ElMessage.warning('请至少选择一个角色')
     return
   }
-  
+
   addLoading.value = true
   try {
     const response = await http.post('/user/addAliasCharacters', {
@@ -381,7 +381,7 @@ import { Eleme } from '@element-plus/icons-vue'
       <div>
         <el-row :gutter="20" align="middle">
           <el-col :span="12" align="middle">
-            <el-button @click="addCharacterConfirm = true">添加角色</el-button>
+            <!-- <el-button @click="addCharacterConfirm = true">添加角色</el-button> -->
           </el-col>
           <el-col :span="12">
             <span>主角色：</span>
@@ -400,11 +400,11 @@ import { Eleme } from '@element-plus/icons-vue'
           <el-table-column prop="name" label="角色名称" />
           <el-table-column prop="expiresDate" label="过期时间" />
           <el-table-column prop="corpName" label="公司名称" />
-          <el-table-column prop="action" label="操作">
+          <!-- <el-table-column prop="action" label="操作">
             <template #default="scope">
               <el-button type="primary" @click="handleDelete(scope.row)">删除</el-button>
             </template>
-          </el-table-column>
+          </el-table-column> -->
         </el-table>
       </div>
       <el-dialog v-model="addCharacterConfirm" title="绑定ESI" width="30%" center>
@@ -442,7 +442,7 @@ import { Eleme } from '@element-plus/icons-vue'
             <el-button class="transfer-footer" size="small" @click="addNewCharacterProcess = true"><el-icon><Plus /></el-icon></el-button>
           </el-tooltip>
 
-          <el-dialog 
+          <el-dialog
             v-model="addNewCharacterProcess"
             style="max-width: 60%;"
           >
@@ -468,12 +468,12 @@ import { Eleme } from '@element-plus/icons-vue'
                 <el-button style="width: 100%;" type="primary" @click="searchCharacters" :loading="searchLoading">搜索</el-button>
               </el-col>
             </el-row>
-            
+
             <!-- 搜索结果表格 -->
             <el-row v-if="searchResults.length > 0">
               <el-col :span="24">
-                <el-table 
-                  :data="searchResults" 
+                <el-table
+                  :data="searchResults"
                   style="width: 100%"
                   @selection-change="handleSelectionChange"
                 >
@@ -486,9 +486,9 @@ import { Eleme } from '@element-plus/icons-vue'
 
             <el-row v-if="searchResults.length > 0">
               <el-col :span="6" :offset="9">
-                <el-button 
-                  style="width: 100%;" 
-                  type="primary" 
+                <el-button
+                  style="width: 100%;"
+                  type="primary"
                   @click="addSelectedCharacters"
                   :loading="addLoading"
                   :disabled="selectedCharacterIds.length === 0"
@@ -501,8 +501,8 @@ import { Eleme } from '@element-plus/icons-vue'
           </el-dialog>
         </template>
         <template #right-footer>
-          <el-button 
-            class="transfer-footer" 
+          <el-button
+            class="transfer-footer"
             size="small"
             @click="handleSaveAliasCharacters"
           >
