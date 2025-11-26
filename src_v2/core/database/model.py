@@ -11,7 +11,7 @@ from sqlalchemy import (
     BigInteger,
     UUID,
     ARRAY,
-    TIMESTAMP,
+    type_=TIMESTAMP(timezone=True),
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
@@ -24,10 +24,10 @@ class User(PostgreModel):
     __tablename__ = 'user'
     user_name = Column(Text, primary_key=True, nullable=False)
     display_name = Column(Text)
-    create_date = Column(TIMESTAMP)
+    create_date = Column(type_=TIMESTAMP(timezone=True))
     access_token = Column(Text)
     refresh_token = Column(Text)
-    token_expires_at = Column(TIMESTAMP)
+    token_expires_at = Column(type_=TIMESTAMP(timezone=True))
 all_model.append(User)
 
 class UserData(PostgreModel):
@@ -41,7 +41,7 @@ class VipState(PostgreModel):
     __tablename__ = 'vip_state'
     user_name = Column(Text, ForeignKey("user.user_name"), primary_key=True)
     vip_level = Column(Text)
-    vip_end_date = Column(TIMESTAMP)
+    vip_end_date = Column(type_=TIMESTAMP(timezone=True))
 all_model.append(VipState)
 
 
@@ -91,10 +91,10 @@ class EveAuthedCharacter(PostgreModel):
     character_id = Column(Integer, primary_key=True, nullable=False)
     owner_user_name = Column(Text, nullable=False)
     character_name = Column(Text, index=True)
-    birthday = Column(TIMESTAMP)
+    birthday = Column(type_=TIMESTAMP(timezone=True))
     access_token = Column(Text, nullable=True)
     # refresh_token = Column(Text)
-    expires_time = Column(TIMESTAMP, nullable=True)
+    expires_time = Column(type_=TIMESTAMP(timezone=True), nullable=True)
     corporation_id = Column(Integer)
     director = Column(Boolean)
 all_model.append(EveAuthedCharacter)
@@ -111,7 +111,7 @@ class EvePublicCharacterInfo(PostgreModel):
     __tablename__ = 'eve_public_character_info'
     character_id = Column(Integer, primary_key=True)
     alliance_id = Column(Integer)
-    birthday = Column(TIMESTAMP)
+    birthday = Column(type_=TIMESTAMP(timezone=True))
     bloodline_id = Column(Integer)
     corporation_id = Column(Integer, nullable=False)
     description = Column(Text)
@@ -129,7 +129,7 @@ class EveCorporation(PostgreModel):
     alliance_id = Column(Integer)
     ceo_id = Column(Integer)
     creator_id = Column(Integer)
-    date_founded = Column(TIMESTAMP)
+    date_founded = Column(type_=TIMESTAMP(timezone=True))
     description = Column(Text)
     faction_id = Column(Integer)
     home_station_id = Column(Integer)
@@ -153,7 +153,7 @@ class EveAssetPullMission(PostgreModel):
     asset_owner_type = Column(Text)
     asset_owner_id = Column(Integer)
     active = Column(Boolean)
-    last_pull_time = Column(TIMESTAMP)
+    last_pull_time = Column(type_=TIMESTAMP(timezone=True))
 all_model.append(EveAssetPullMission)
 
 # 工业资产容器权限
